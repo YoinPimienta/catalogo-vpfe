@@ -37,19 +37,28 @@
 
         <!-- HEADER ROW -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; margin-bottom: 15px;">
-            <div style="font-size: 11px; color: #555; word-wrap: break-word; font-family: Arial, sans-serif; line-height: 1.3;">
-                <img src="{% static 'img/Dian_logo_sin_texto.jpg' %}" style="height: 45px; margin-bottom: 8px;" alt="DIAN">
+            <div
+                style="font-size: 11px; color: #555; word-wrap: break-word; font-family: Arial, sans-serif; line-height: 1.3;">
+                <img src="{% static 'img/Dian_logo_sin_texto.jpg' %}" style="height: 45px; margin-bottom: 8px;"
+                    alt="DIAN">
                 <div style="font-weight: bold; color: #333;">CUFE:</div>
-                <div style="word-break: break-all;">{% if factura %}{{ factura.cufe }}{% else %}0d0713b75ab55cd881246ad25f40daa5772ccc1466c40f272c546231d249dd3c3fd353182390fdccf7961cd0a876c66a{% endif %}</div>
+                <div style="word-break: break-all;">{% if factura %}{{ factura.cufe }}{% else
+                    %}0d0713b75ab55cd881246ad25f40daa5772ccc1466c40f272c546231d249dd3c3fd353182390fdccf7961cd0a876c66a{%
+                    endif %}</div>
             </div>
 
-            <div style="text-align: right; font-size: 11px; color: #333; line-height: 1.4; font-family: Arial, sans-serif;">
+            <div
+                style="text-align: right; font-size: 11px; color: #333; line-height: 1.4; font-family: Arial, sans-serif;">
                 <div style="font-weight: bold; font-size: 13px; text-transform: uppercase;">Factura electrónica</div>
-                <div style="color: #555;">Serie: <strong>{% if factura %}{{ factura.serie }}{% else %}I041{% endif %}</strong></div>
-                <div style="color: #555;">Folio: <strong>{% if factura %}{{ factura.folio }}{% else %}15129088{% endif %}</strong></div>
-                <div style="color: #555;">Fecha de emisión: <strong>{% if factura %}{{ factura.fecha_emision|date:"d-m-Y" }}{% else %}26-03-2026{% endif %}</strong></div>
+                <div style="color: #555;">Serie: <strong>{% if factura %}{{ factura.serie }}{% else %}I041{% endif
+                        %}</strong></div>
+                <div style="color: #555;">Folio: <strong>{% if factura %}{{ factura.folio }}{% else %}15129088{% endif
+                        %}</strong></div>
+                <div style="color: #555;">Fecha de emisión: <strong>{% if factura %}{{
+                        factura.fecha_emision|date:"d-m-Y" }}{% else %}26-03-2026{% endif %}</strong></div>
                 <div style="margin-top: 8px;">
-                    <a href="#" style="color: #005A9C; text-decoration: none; font-weight: bold; font-size: 11px;" onclick="window.print()">
+                    <a href="{% url 'descargar_pdf_factura' factura.cufe %}" target="_blank"
+                        style="color: #005A9C; text-decoration: none; font-weight: bold; font-size: 11px;">
                         <i class="bi bi-download"></i> Descargar PDF
                     </a>
                 </div>
@@ -59,21 +68,34 @@
         <div style="border-top: 1px solid #e1e3e6; margin: 0; width: 100%;"></div>
 
         <!-- DATOS ROW -->
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 15px; margin-bottom: 15px; font-family: Arial, sans-serif; font-size: 11px;">
+        <div
+            style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 15px; margin-bottom: 15px; font-family: Arial, sans-serif; font-size: 11px;">
             <div>
-                <div style="font-weight: bold; color: #333; text-transform: uppercase; margin-bottom: 6px; font-size: 11px;">DATOS DEL EMISOR</div>
-                <div style="color: #555; margin-bottom: 2px;">NIT: <strong>{% if factura %}{{ factura.emisor_nit }}{% else %}891408584{% endif %}</strong></div>
-                <div style="color: #555;">Nombre: <strong>{% if factura %}{{ factura.emisor_nombre }}{% else %}FRISBY S.A. BIC{% endif %}</strong></div>
+                <div
+                    style="font-weight: bold; color: #333; text-transform: uppercase; margin-bottom: 6px; font-size: 11px;">
+                    DATOS DEL EMISOR</div>
+                <div style="color: #555; margin-bottom: 2px;">NIT: <strong>{% if factura %}{{ factura.emisor_nit }}{%
+                        else %}891408584{% endif %}</strong></div>
+                <div style="color: #555;">Nombre: <strong>{% if factura %}{{ factura.emisor_nombre }}{% else %}FRISBY
+                        S.A. BIC{% endif %}</strong></div>
             </div>
             <div>
-                <div style="font-weight: bold; color: #333; text-transform: uppercase; margin-bottom: 6px; font-size: 11px;">DATOS DEL RECEPTOR</div>
-                <div style="color: #555; margin-bottom: 2px;">NIT: <strong>{% if factura %}{{ factura.receptor_nit }}{% else %}7108376{% endif %}</strong></div>
-                <div style="color: #555;">Nombre: <strong>{% if factura %}{{ factura.receptor_nombre }}{% else %}DANI QUINTERO{% endif %}</strong></div>
+                <div
+                    style="font-weight: bold; color: #333; text-transform: uppercase; margin-bottom: 6px; font-size: 11px;">
+                    DATOS DEL RECEPTOR</div>
+                <div style="color: #555; margin-bottom: 2px;">NIT: <strong>{% if factura %}{{ factura.receptor_nit }}{%
+                        else %}7108376{% endif %}</strong></div>
+                <div style="color: #555;">Nombre: <strong>{% if factura %}{{ factura.receptor_nombre }}{% else %}DANI
+                        QUINTERO{% endif %}</strong></div>
             </div>
             <div>
-                <div style="font-weight: bold; color: #333; text-transform: uppercase; margin-bottom: 6px; font-size: 11px;">TOTALES E IMPUESTOS</div>
-                <div style="color: #555; margin-bottom: 2px;">IVA: $<strong>{% if factura %}{{ factura.iva|floatformat:"0" }}{% else %}0{% endif %}</strong></div>
-                <div style="color: #333; font-size: 12px; font-weight: bold; margin-top: 4px;">Total: ${% if factura %}{{ factura.total|floatformat:"0" }}{% else %}58,000{% endif %}</div>
+                <div
+                    style="font-weight: bold; color: #333; text-transform: uppercase; margin-bottom: 6px; font-size: 11px;">
+                    TOTALES E IMPUESTOS</div>
+                <div style="color: #555; margin-bottom: 2px;">IVA: $<strong>{% if factura %}{{
+                        factura.iva|floatformat:"0" }}{% else %}0{% endif %}</strong></div>
+                <div style="color: #333; font-size: 12px; font-weight: bold; margin-top: 4px;">Total: ${% if factura
+                    %}{{ factura.total|floatformat:"0" }}{% else %}58,000{% endif %}</div>
             </div>
         </div>
 
@@ -81,7 +103,9 @@
 
         <!-- ESTADO EN EL REGISTRO -->
         <div style="margin-top: 20px; margin-bottom: 20px;">
-            <div style="color: #333; font-weight: bold; font-size: 13px; margin-bottom: 20px; text-transform: uppercase; font-family: Arial, sans-serif;">ESTADO EN EL REGISTRO DE FACTURAS ELECTRÓNICAS</div>
+            <div
+                style="color: #333; font-weight: bold; font-size: 13px; margin-bottom: 20px; text-transform: uppercase; font-family: Arial, sans-serif;">
+                ESTADO EN EL REGISTRO DE FACTURAS ELECTRÓNICAS</div>
 
             <div style="display: flex; align-items: center;">
                 <div style="flex: 0 0 200px; text-align: center;">
@@ -103,7 +127,8 @@
 
                 <div
                     style="flex: 1; text-align: center; color: #555; font-size: 16px; font-family: Arial, sans-serif; margin-top: -30px;">
-                    Legítimo Tenedor actual: <span style="color: #666;">{{ factura.emisor_nombre|default:"FRISBY S.A. BIC" }}</span> </div>
+                    Legítimo Tenedor actual: <span style="color: #666;">{{ factura.emisor_nombre|default:"FRISBY S.A.
+                        BIC" }}</span> </div>
             </div>
         </div>
 
@@ -111,7 +136,8 @@
 
         <!-- VALIDACIONES -->
         <div style="margin-top: 20px;">
-            <div style="color: #333; font-size: 13px; font-family: Arial, sans-serif; font-weight: bold; margin-bottom: 10px; text-transform: uppercase;">
+            <div
+                style="color: #333; font-size: 13px; font-family: Arial, sans-serif; font-weight: bold; margin-bottom: 10px; text-transform: uppercase;">
                 Validaciones del documento</div>
             <table
                 style="width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px; color: #555;">
@@ -155,7 +181,8 @@
 
         <!-- EVENTOS -->
         <div style="margin-top: 20px;">
-            <div style="color: #333; font-size: 13px; font-family: Arial, sans-serif; font-weight: bold; margin-bottom: 10px; text-transform: uppercase;">
+            <div
+                style="color: #333; font-size: 13px; font-family: Arial, sans-serif; font-weight: bold; margin-bottom: 10px; text-transform: uppercase;">
                 Eventos de la factura electrónica</div>
             <div
                 style="background-color: #f7f9fa; text-align: center; color: #666; font-size: 12px; font-family: Arial, sans-serif; padding: 15px;">

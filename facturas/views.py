@@ -1,4 +1,7 @@
 from django.shortcuts import render
+from django.template.loader import render_to_string
+from django.http import HttpResponse
+from weasyprint import HTML
 from .models import Factura
 
 def buscar_factura(request):
@@ -14,7 +17,6 @@ def buscar_factura(request):
             error = "Documento no encontrado. Verifique el código ingresado e intente nuevamente."
 
     return render(request, 'buscar.html', {'error': error, 'cufe': cufe})
-
 def ver_factura(request, cufe):
     try:
         factura = Factura.objects.get(cufe=cufe)
@@ -22,9 +24,23 @@ def ver_factura(request, cufe):
     except Factura.DoesNotExist:
         return render(request, 'buscar.html', {'error': "Documento no encontrado."})
 
-from django.contrib.auth.models import User
+def descargar_pdf_factura(request, cufe):
+    try:
+        factura = Factura.objects.get(cufe=cufe)
+        html_string = render_to_string('factura_pdf.html', {'factura': factura, 'request': request})
+        
+        # Generar el PDF
+        pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
+        
+        current_serie = factura.serie if factura.serie else "I0"
+        current_folio = factura.folio if factura.folio else "00"
+        
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="Factura_{current_serie}_{current_folio}.pdf"'
+        return response
+    except Factura.DoesNotExist:
+        return HttpResponse("Factura no encontrada.", status=404)
 
-from django.http import HttpResponse
 from django.contrib.auth.models import User
 
 def crear_admin(request):

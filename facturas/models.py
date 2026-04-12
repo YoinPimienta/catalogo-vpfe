@@ -17,14 +17,24 @@ class Factura(models.Model):
     serie = models.CharField(max_length=20)
     folio = models.CharField(max_length=20)
     fecha_emision = models.DateField(default=date.today)
+    fecha_vencimiento = models.DateField(null=True, blank=True)
+    forma_pago = models.CharField(max_length=50, default="Contado")
+    medio_pago = models.CharField(max_length=50, default="Efectivo")
+    tipo_operacion = models.CharField(max_length=100, default="10 - Estándar")
     
     # Emisor
     emisor_nombre = models.CharField(max_length=200)
     emisor_nit = models.CharField(max_length=50)
+    emisor_direccion = models.CharField(max_length=255, default="No Registrada")
+    emisor_telefono = models.CharField(max_length=50, default="0000000000")
+    emisor_correo = models.CharField(max_length=150, default="facturacion@empresa.com")
     
     # Receptor
     receptor_nombre = models.CharField(max_length=200)
     receptor_nit = models.CharField(max_length=50)
+    receptor_direccion = models.CharField(max_length=255, default="No Registrada")
+    receptor_telefono = models.CharField(max_length=50, default="0000000000")
+    receptor_correo = models.CharField(max_length=150, default="cliente@correo.com")
     
     # Totales
     subtotal = models.DecimalField(max_digits=15, decimal_places=2, default=0)
