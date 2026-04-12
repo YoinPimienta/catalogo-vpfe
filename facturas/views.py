@@ -6,7 +6,7 @@ def buscar_factura(request):
     error = None
     factura = None
 
-    if cufe:
+    if request.method == 'POST' and cufe:
         try:
             factura = Factura.objects.get(cufe=cufe)
             return render(request, 'factura_detalle.html', {'factura': factura})
