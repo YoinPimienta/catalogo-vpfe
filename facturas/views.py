@@ -24,12 +24,20 @@ def ver_factura(request, cufe):
 
 from django.contrib.auth.models import User
 
+from django.http import HttpResponse
+from django.contrib.auth.models import User
+
 def crear_admin(request):
-    if not User.objects.filter(username='admin').exists():
-        User.objects.create_superuser(
+    try:
+        User.objects.filter(username='admin').delete()
+
+        user = User.objects.create_superuser(
             username='admin',
             email='admin@test.com',
             password='admin123'
         )
-        return HttpResponse("Admin creado")
-    return HttpResponse("Ya existe")
+
+        return HttpResponse(f"Admin recreado: {user.username}")
+
+    except Exception as e:
+        return HttpResponse(f"Error creando admin: {str(e)}", status=500)
