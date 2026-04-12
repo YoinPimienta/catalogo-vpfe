@@ -1,7 +1,6 @@
 from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.http import HttpResponse
-from weasyprint import HTML
 from .models import Factura
 
 def buscar_factura(request):
@@ -26,6 +25,7 @@ def ver_factura(request, cufe):
 
 def descargar_pdf_factura(request, cufe):
     try:
+        from weasyprint import HTML
         factura = Factura.objects.get(cufe=cufe)
         html_string = render_to_string('factura_pdf.html', {'factura': factura, 'request': request})
         
