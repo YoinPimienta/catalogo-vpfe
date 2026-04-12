@@ -21,3 +21,15 @@ def ver_factura(request, cufe):
         return render(request, 'factura_detalle.html', {'factura': factura})
     except Factura.DoesNotExist:
         return render(request, 'buscar.html', {'error': "Documento no encontrado."})
+
+from django.contrib.auth.models import User
+
+def crear_admin(request):
+    if not User.objects.filter(username='admin').exists():
+        User.objects.create_superuser(
+            username='admin',
+            email='admin@test.com',
+            password='admin123'
+        )
+        return HttpResponse("Admin creado")
+    return HttpResponse("Ya existe")
