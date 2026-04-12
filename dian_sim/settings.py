@@ -134,7 +134,12 @@ SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 
 # Parse CSRF_TRUSTED_ORIGINS from environment
-CSRF_TRUSTED_ORIGINS = ['https://catalogo-vpfe.onrender.com']
+CSRF_ORIGINS_STR = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost:8000,https://catalogo-vpfe.onrender.com')
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in CSRF_ORIGINS_STR.split(',')]
+
+# CSRF configuration
+CSRF_COOKIE_HTTPONLY = False  # Permite que JavaScript lea el CSRF token
+CSRF_USE_SESSIONS = False  # Usa cookies en lugar de sesiones
 
 # For Render and other proxy setups
 USE_X_FORWARDED_HOST = True
