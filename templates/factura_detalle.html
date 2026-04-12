@@ -1,0 +1,201 @@
+{% extends "base_busqueda.html" %}
+{% load static %}
+
+{% block content %}
+<style>
+    /* Ocultar el layout principal de búsqueda si estamos mostrando factura */
+    /* Ya que base_busqueda.html tiene un contenedor flex-grow-1, vamos a sobreescribirlo aquí */
+    body {
+        background-color: #FFFFFF !important;
+    }
+
+    .layout-wrapper-to-hide {
+        display: none !important;
+    }
+</style>
+
+<!-- Aquí rompemos el contenedor de base para mostrar la factura en pantalla completa -->
+<div
+    style="position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: #fdfdfd; z-index: 9999; overflow-y: auto;">
+
+    <!-- Botón Volver -->
+    <div style="margin-left: 20px; margin-top: 15px;">
+        <a href="/" style="color: #7A5252; text-decoration: none; font-family: Arial, sans-serif; font-size: 14px;">
+            < Volver </a>
+    </div>
+
+    <!-- Pestañita superficial -->
+    <div style="display: flex; margin-left: 20px; margin-top: 10px;">
+        <div
+            style="font-size: 12px; font-family: Arial, sans-serif; font-weight: bold; color: #555; border: 1px solid #ddd; border-bottom: none; border-top: 3px solid #005A9C; padding: 8px 15px; background: white;">
+            Factura electrónica
+        </div>
+    </div>
+
+    <div style="border-top: 1px solid #ddd; border-bottom: 2px solid #005A9C; padding: 40px 60px; max-width: 1400px; margin: 0 auto; background: white; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;"
+        id="invoiceWrapper">
+
+        <!-- HEADER ROW -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px;">
+            <div style="flex: 0 0 auto;">
+                <img src="/static/img/Dian_logo_sin_texto.jpg" style="height: 55px;" alt="DIAN">
+            </div>
+
+            <div
+                style="flex: 1; padding: 0 40px; font-size: 13px; color: #555; word-wrap: break-word; font-family: Arial, sans-serif;">
+                <div style="font-weight: normal; color: #666; margin-bottom: 2px;">CUFE:</div>
+                <div style="font-family: inherit;">{% if factura %}{{ factura.cufe }}{% else %}0d0713b75ab55cd881246ad25f40daa5772ccc1466c40f272c546231d249dd3c3fd353182390fdccf7961cd0a876c66a{% endif %}</div>
+            </div>
+
+            <div
+                style="flex: 0 0 auto; text-align: right; font-size: 12px; color: #333; line-height: 1.5; font-family: Arial, sans-serif;">
+                <div style="font-weight: bold;">Factura electrónica</div>
+                <div style="color: #555;">Serie: {% if factura %}{{ factura.serie }}{% else %}I041{% endif %}</div>
+                <div style="color: #555;">Folio: {% if factura %}{{ factura.folio }}{% else %}15129088{% endif %}</div>
+                <div style="color: #555;">Fecha de emisión de la factura Electrónica: {% if factura %}{{ factura.fecha_emision|date:"d-m-Y" }}{% else %}26-03-2026{% endif %}</div>
+                <div style="margin-top: 8px;">
+                    <a href="#" style="color: #1aa390; text-decoration: underline; font-weight: bold; font-size: 14px;"
+                        onclick="window.print()">
+                        <i class="bi bi-download"></i> Descargar PDF
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div style="border-top: 1px solid #e1e3e6; margin: 0; width: 100%;"></div>
+
+        <!-- DATOS ROW -->
+        <div style="display: flex; justify-content: space-between; margin-top: 30px; margin-bottom: 30px;">
+            <div style="font-size: 12px; font-family: Arial, sans-serif; flex: 1;">
+                <div
+                    style="font-weight: bold; color: #555; text-transform: uppercase; margin-bottom: 8px; font-size: 13px;">
+                    DATOS DEL EMISOR</div>
+                <div style="color: #555;">NIT: {% if factura %}{{ factura.emisor_nit }}{% else %}891408584{% endif %}
+                </div>
+                <div style="color: #555;">Nombre: {% if factura %}{{ factura.emisor_nombre }}{% else %}FRISBY S.A. BIC{% endif %}</div>
+            </div>
+            <div style="font-size: 12px; font-family: Arial, sans-serif; flex: 1;">
+                <div
+                    style="font-weight: bold; color: #555; text-transform: uppercase; margin-bottom: 8px; font-size: 13px;">
+                    DATOS DEL RECEPTOR</div>
+                <div style="color: #555;">NIT: {% if factura %}{{ factura.receptor_nit }}{% else %}7108376{% endif %}
+                </div>
+                <div style="color: #555;">Nombre: {% if factura %}{{ factura.receptor_nombre }}{% else %}DANI QUINTERO{% endif %}</div>
+            </div>
+            <div style="font-size: 12px; font-family: Arial, sans-serif; text-align: right; flex: 1;">
+                <div
+                    style="font-weight: bold; color: #555; text-transform: uppercase; margin-bottom: 8px; font-size: 13px;">
+                    TOTALES E IMPUESTOS</div>
+                <div style="color: #555;">IVA: ${% if factura %}{{ factura.iva|floatformat:"0" }}{% else %}0{% endif %}
+                </div>
+                <div style="color: #333; font-weight: bold; margin-top: 2px;">Total: ${% if factura %}{{ factura.total|floatformat:"0" }}{% else %}58,000{% endif %}</div>
+            </div>
+        </div>
+
+        <div style="border-top: 1px solid #e1e3e6; margin: 0; width: 100%;"></div>
+
+        <!-- ESTADO EN EL REGISTRO -->
+        <div style="margin-top: 30px; margin-bottom: 30px;">
+            <div style="color: #666; font-size: 16px; margin-bottom: 40px; font-family: Arial, sans-serif;">ESTADO EN EL
+                REGISTRO DE FACTURAS ELECTRÓNICAS</div>
+
+            <div style="display: flex; align-items: center;">
+                <div style="flex: 0 0 200px; text-align: center;">
+                    <div
+                        style="background-color: #41D78C; border-radius: 4px; width: 45px; height: 45px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 10px; position: relative;">
+                        <!-- Triangulito hacia abajo -->
+                        <div
+                            style="position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 8px solid #41D78C;">
+                        </div>
+                        <!-- Icono SVG simulado recibo -->
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="4" y="2" width="16" height="20" rx="2" stroke="white" stroke-width="2" />
+                            <path d="M8 6h8M8 10h8M8 14h4" stroke="white" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                    </div>
+                    <div style="color: #666; font-size: 12px; font-family: Arial, sans-serif; line-height: 1.3;">
+                        Factura<br>Electrónica</div>
+                </div>
+
+                <div
+                    style="flex: 1; text-align: center; color: #555; font-size: 16px; font-family: Arial, sans-serif; margin-top: -30px;">
+                    Legítimo Tenedor actual: <span style="color: #666;">{{ factura.emisor_nombre|default:"FRISBY S.A. BIC" }}</span> </div>
+            </div>
+        </div>
+
+        <div style="border-top: 1px solid #e1e3e6; margin: 0; width: 100%;"></div>
+
+        <!-- VALIDACIONES -->
+        <div style="margin-top: 30px;">
+            <div
+                style="color: #666; font-size: 16px; font-family: Arial, sans-serif; font-weight: bold; margin-bottom: 15px;">
+                Validaciones del documento</div>
+            <table
+                style="width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px; color: #555;">
+                <thead>
+                    <tr style="border-bottom: 1px solid #e1e3e6;">
+                        <th style="text-align: left; padding: 12px 10px; font-weight: bold; color: #333;">Nombre</th>
+                        <th style="text-align: left; padding: 12px 10px; font-weight: bold; color: #333;">Resultado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="background-color: #f7f9fa; border-bottom: 2px solid white;">
+                        <td style="padding: 12px 10px;">TaxableAmount</td>
+                        <td style="padding: 12px 10px;">
+                            <span
+                                style="background-color: #5D9CEC; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px;">Notificación
+                                <i class="bi bi-info-circle-fill"
+                                    style="opacity: 0.8; margin-left: 2px; color: #333;"></i></span>
+                        </td>
+                    </tr>
+                    <tr style="background-color: #f7f9fa; border-bottom: 2px solid white;">
+                        <td style="padding: 12px 10px;">Valida NIT</td>
+                        <td style="padding: 12px 10px;">
+                            <span
+                                style="background-color: #5D9CEC; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px;">Notificación
+                                <i class="bi bi-info-circle-fill"
+                                    style="opacity: 0.8; margin-left: 2px; color: #333;"></i></span>
+                        </td>
+                    </tr>
+                    <tr style="background-color: #f7f9fa;">
+                        <td style="padding: 12px 10px;">Valida NIT</td>
+                        <td style="padding: 12px 10px;">
+                            <span
+                                style="background-color: #5D9CEC; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px;">Notificación
+                                <i class="bi bi-info-circle-fill"
+                                    style="opacity: 0.8; margin-left: 2px; color: #333;"></i></span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- EVENTOS -->
+        <div style="margin-top: 30px;">
+            <div
+                style="color: #666; font-size: 16px; font-family: Arial, sans-serif; font-weight: bold; margin-bottom: 15px;">
+                Eventos de la factura electrónica</div>
+            <div
+                style="background-color: #f7f9fa; text-align: center; color: #666; font-size: 12px; font-family: Arial, sans-serif; padding: 15px;">
+                No tiene eventos asociados.
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // Parche para ocultar la barra lateral y contenedor principal si renderizan el detalle por AJAX
+    document.addEventListener("DOMContentLoaded", function () {
+        const busquedaWrapper = document.querySelector('.d-flex.flex-grow-1');
+        if (busquedaWrapper) {
+            busquedaWrapper.style.display = 'none';
+        }
+        const headers = document.querySelectorAll('header');
+        headers.forEach(h => h.style.display = 'none');
+        document.querySelector('.header-gov').style.display = 'none';
+        document.querySelector('footer').style.display = 'none';
+    });
+</script>
+
+{% endblock %}

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SISTEMA DE FACTURA ELECTRÓNICA - DIAN</title>
+    <!-- Use Bootstrap 5 for layout -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/dian_styles.css?v=8" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+</head>
+<body class="d-flex flex-column min-vh-100">
+
+    <!-- Bar GOV.CO -->
+    <div class="header-gov w-100">
+        <span><img src="/static/img/Gov.co.png" alt="GOV.CO" height="18"></span>
+    </div>
+
+    <!-- Main Header -->
+    <header class="header-logo shadow-sm d-flex align-items-center">
+        <div class="d-flex align-items-center">
+            <img src="/static/img/Sistema_Facturacion_Logo.png" alt="Sistema Facturación Electrónica" height="40" class="me-3 border-end border-2 pe-3">
+            <img src="/static/img/Dian_logo_sin_texto.jpg" alt="DIAN" height="35" class="ms-1">
+        </div>
+    </header>
+
+    <div class="flex-grow-1 d-flex justify-content-center py-4" style="background-color: #F6F7F9;">
+        <div class="d-flex flex-column flex-md-row bg-white" style="width: auto; align-self: flex-start; border: 1px solid #e1e3e6; margin-top: 1rem;">
+            <!-- Sidebar -->
+            <div class="col-auto sidebar border-end d-none d-md-flex flex-column align-items-center pt-0 bg-white">
+                <a href="#" class="sidebar-btn text-decoration-none text-center">
+                    <img src="/static/img/Administrator.svg" class="sidebar-icon" alt="Administrador">
+                    <span class="sidebar-text">Administrador</span>
+                </a>
+                <a href="#" class="sidebar-btn text-decoration-none text-center">
+                    <img src="/static/img/Company.svg" class="sidebar-icon" alt="Empresa">
+                    <span class="sidebar-text">Empresa</span>
+                </a>
+                <!-- Enlace oculto al admin -->
+                <a href="/admin/" class="sidebar-btn text-decoration-none text-center">
+                    <img src="/static/img/Person.svg" class="sidebar-icon" alt="Persona">
+                    <span class="sidebar-text">Persona</span>
+                </a>
+                <a href="#" class="sidebar-btn text-decoration-none text-center">
+                    <img src="/static/img/NotObligued.svg" class="sidebar-icon" alt="No Facturador">
+                    <span class="sidebar-text">No Facturador</span>
+                </a>
+                <a href="#" class="sidebar-btn text-decoration-none text-center">
+                    <img src="/static/img/Certificate.svg" class="sidebar-icon" alt="Certificado">
+                    <span class="sidebar-text">Certificado</span>
+                </a>
+                <a href="/" class="sidebar-btn text-decoration-none text-center active text-white bg-cyan-custom">
+                    <img src="/static/img/SearchDocument.svg" class="sidebar-icon" alt="Buscar Documento">
+                    <span class="sidebar-text fw-bold">Buscar<br>Documento</span>
+                </a>
+            </div>
+
+            <!-- Content Area -->
+            <main class="col bhoechie-tab-content active text-start">
+                <div class="content-wrapper">
+                    {% block content %}{% endblock %}
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Footer DIAN Real -->
+    <footer class="text-white pt-4 pb-4 mt-auto" style="background-color: #3366CC; font-family: 'Segoe UI', Arial, sans-serif;">
+        <div class="container-fluid px-5">
+            <div class="row">
+                <!-- Columna 1 -->
+                <div class="col-md-3 mb-4 d-flex flex-column align-items-start">
+                    <img src="https://www.gov.co/assets/images/logo_gov_co.png" alt="GOV.CO" height="22" style="filter: brightness(0) invert(1);" class="mb-3">
+                    <!-- Placeholder de CO Colombia porque la url real suele cambiar, usando un texto o logo SVG -->
+                    <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="50" cy="50" r="50" fill="#FFC107"/>
+                        <circle cx="50" cy="50" r="35" fill="#141E61"/>
+                        <circle cx="50" cy="50" r="20" fill="#E41E2B"/>
+                        <text x="50%" y="55%" text-anchor="middle" fill="white" font-size="28" font-weight="bold" font-family="Arial">CO</text>
+                    </svg>
+                </div>
+                
+                <!-- Columna 2 -->
+                <div class="col-md-4 mb-4 border-start border-white-50 ps-4">
+                    <h6 class="fw-bold mb-3" style="font-size: 0.85rem;">Dirección de Impuestos y Aduanas Nacionales</h6>
+                    <p class="mb-1" style="font-size: 0.75rem;">Dirección: Sede principal | Bogotá, Nivel Central, carrera 8 Nº 6C - 38</p>
+                    <p class="mb-1" style="font-size: 0.75rem;">Edificio San Agustín</p>
+                    <p class="mb-1" style="font-size: 0.75rem;">Código Postal: 111711</p>
+                    <p class="mb-3" style="font-size: 0.75rem;">Horario Contact Center: Lunes a Viernes 8:00 a.m. a 7:00 p.m. y Sábados de 8:00 a.m. a 12:00 m</p>
+                    
+                    <div class="d-flex gap-2">
+                        <a href="#" class="text-white bg-white bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center text-decoration-none" style="width: 25px; height: 25px;"><i class="bi bi-twitter"></i></a>
+                        <a href="#" class="text-white bg-white bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center text-decoration-none" style="width: 25px; height: 25px;"><i class="bi bi-youtube"></i></a>
+                        <a href="#" class="text-white bg-white bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center text-decoration-none" style="width: 25px; height: 25px;"><i class="bi bi-linkedin"></i></a>
+                        <a href="#" class="text-white bg-white bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center text-decoration-none" style="width: 25px; height: 25px;"><i class="bi bi-facebook"></i></a>
+                        <a href="#" class="text-white bg-white bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center text-decoration-none" style="width: 25px; height: 25px;"><i class="bi bi-instagram"></i></a>
+                    </div>
+                </div>
+
+                <!-- Columna 3 -->
+                <div class="col-md-5 mb-0 px-md-4 pb-2 border-start border-white-50">
+                    <div class="d-flex align-items-center mb-0 mt-n1">
+                        <i class="bi bi-telephone-fill me-2 fs-6"></i>
+                        <span class="fw-bold" style="font-size: 0.85rem;">Contacto</span>
+                    </div>
+                    <h6 class="fw-bold mb-2 mt-3" style="font-size: 0.85rem;">Contact Center</h6>
+                    <p class="mb-1" style="font-size: 0.7rem;">57 601 489 9000 Línea de Contact Center atención de Impuestos</p>
+                    <p class="mb-1" style="font-size: 0.7rem;">57 601 794 8880 Línea de Contact Center atención de Aduanas</p>
+                    <p class="mb-3" style="font-size: 0.7rem;">57 601 794 8883 Línea Centro Nacional de Cobro</p>
+                    
+                    <h6 class="fw-bold mb-2" style="font-size: 0.85rem;">Servicio en Línea de Contacto</h6>
+                    <div style="font-size: 0.7rem; line-height: 1.6;">
+                        <a href="#" class="text-white text-decoration-none text-decoration-underline-hover">PQSR y Denuncias</a> | 
+                        <a href="#" class="text-white text-decoration-none text-decoration-underline-hover">Puntos de contacto</a><br>
+                        <a href="#" class="text-white text-decoration-none text-decoration-underline-hover">Política de Seguridad de la Información</a><br>
+                        <a href="#" class="text-white text-decoration-none text-decoration-underline-hover">Política de privacidad y Términos de uso</a><br>
+                        <a href="#" class="text-white text-decoration-none text-decoration-underline-hover">Política de tratamiento de datos personales</a><br>
+                        <a href="#" class="text-white text-decoration-none text-decoration-underline-hover">Notificaciones Judiciales</a> | 
+                        <a href="#" class="text-white text-decoration-none text-decoration-underline-hover">Mapa del sitio</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+    <style>
+        .text-decoration-underline-hover:hover { text-decoration: underline !important; }
+        .border-white-50 { border-color: rgba(255,255,255,0.2) !important; border-left-width: 1px !important; }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
