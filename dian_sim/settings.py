@@ -28,8 +28,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-z5*)+kd6h((t=hc(@c)0z
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
 # Parse ALLOWED_HOSTS from environment, handling spaces properly
-ALLOWED_HOSTS_STR = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1')
-ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS_STR.split(',')]
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -135,8 +134,7 @@ SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 
 # Parse CSRF_TRUSTED_ORIGINS from environment
-CSRF_ORIGINS_STR = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost:8000')
-CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in CSRF_ORIGINS_STR.split(',')]
+CSRF_TRUSTED_ORIGINS = ['https://catalogo-vpfe.onrender.com']
 
 # For Render and other proxy setups
 USE_X_FORWARDED_HOST = True
