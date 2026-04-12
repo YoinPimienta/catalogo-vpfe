@@ -46,7 +46,7 @@ class Factura(models.Model):
 
     def generar_qr(self):
         # La URL que el QR debe tener para redirigir a la página de búsqueda con el CUFE
-        url = f"/?cufe={self.cufe}"  
+        url = f"https://catalogo-vpfe.onrender.com/?cufe={self.cufe}"  
         
         qr = qrcode.QRCode(
             version=1,
