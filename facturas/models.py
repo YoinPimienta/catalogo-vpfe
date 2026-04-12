@@ -4,6 +4,7 @@ import uuid
 import qrcode
 from io import BytesIO
 from django.core.files import File
+import base64
 
 class Factura(models.Model):
     ESTADOS = [
@@ -31,7 +32,7 @@ class Factura(models.Model):
     total = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     estado = models.CharField(max_length=100, choices=ESTADOS, default='Aceptada')
     
-    qr_code = models.ImageField(upload_to='qrs/', blank=True, null=True, help_text="Se generará automáticamente.")
+    qr_code = models.TextField(blank=True, null=True, help_text="Se generar automticamente (Base64).")
 
     def save(self, *args, **kwargs):
         if not self.cufe:
@@ -59,10 +60,10 @@ class Factura(models.Model):
         img = qr.make_image(fill_color="black", back_color="white")
         buffer = BytesIO()
         img.save(buffer, format="PNG")
-        filename = f'qr_{self.cufe}.png'
         
-        # Avoid recursive save loop
-        self.qr_code.save(filename, File(buffer), save=False)
+        # Save as Base64 text!
+        qr_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        self.qr_code = f"data:image/png;base64,{qr_b64}"
         self.save(update_fields=['qr_code'])
 
     def __str__(self):

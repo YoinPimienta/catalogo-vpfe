@@ -12,7 +12,7 @@ class FacturaAdmin(admin.ModelAdmin):
     search_fields = ('cufe', 'serie', 'folio', 'emisor_nombre', 'receptor_nombre', 'emisor_nit')
     list_filter = ('estado', 'fecha_emision')
     inlines = [ProductoInline]
-    readonly_fields = ('qr_code_image', 'subtotal', 'iva', 'total')
+    readonly_fields = ('qr_code', 'qr_code_image', 'subtotal', 'iva', 'total')
     
     fieldsets = (
         ('Identificación del Documento', {
@@ -38,12 +38,12 @@ class FacturaAdmin(admin.ModelAdmin):
 
     def ver_codigo_qr(self, obj):
         if obj.qr_code:
-            return format_html('<a href="{}" target="_blank">Ver QR</a>', obj.qr_code.url)
+            return format_html('<a href="{}" target="_blank">Ver QR</a>', obj.qr_code)
         return "-"
     ver_codigo_qr.short_description = 'QR'
 
     def qr_code_image(self, obj):
         if obj.qr_code:
-            return format_html('<img src="{}" style="max-height: 150px;"/>', obj.qr_code.url)
+            return format_html('<img src="{}" style="max-height: 150px;"/>', obj.qr_code)
         return "-"
     qr_code_image.short_description = 'Vista Prev. QR'
