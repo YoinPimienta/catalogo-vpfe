@@ -40,7 +40,7 @@
             margin-top: 5px;
         }
         .separator {
-            border-top: 3px solid #6BD6A9;
+            border-top: 3px solid #99FFCC;
             margin: 10px 0;
             width: 100%;
         }
@@ -79,14 +79,14 @@
         }
         table.items th {
             background-color: #f7f9fa;
-            border: 1px solid #6BD6A9;
+            border: 1px solid #99FFCC;
             color: #2F6C50;
             padding: 4px;
             text-align: center;
             font-weight: bold;
         }
         table.items td {
-            border: 1px solid #6BD6A9;
+            border: 1px solid #99FFCC;
             padding: 4px;
             text-align: center;
         }
@@ -144,6 +144,14 @@
         .page-break {
             page-break-before: always;
         }
+        .simulation-footnote {
+            margin-top: 40px;
+            font-size: 6pt;
+            color: #aaa;
+            text-align: center;
+            border-top: 1px dashed #ccc;
+            padding-top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -155,8 +163,8 @@
                 <img src="file:///{{ request.build_absolute_uri|slice:':-1' }}/static/img/Dian_logo_sin_texto.jpg" style="height: 40px;" alt="DIAN">
             </td>
             <td style="width: 60%; text-align: center;">
-                <div class="title">Factura Electrónica de Venta</div>
-                <div class="subtitle">Representación Gráfica</div>
+                <div class="title"><strong>FACTURA ELECTRÓNICA DE VENTA</strong></div>
+                <div class="subtitle"><strong>Representación Gráfica</strong></div>
             </td>
             <td style="width: 20%; text-align: right;">
                 <img src="file:///{{ request.build_absolute_uri|slice:':-1' }}/static/img/Dian_logo_sin_texto.jpg" style="height: 40px;" alt="DIAN">
@@ -186,8 +194,8 @@
             <td style="width: 50%;">
                 <span class="label">Forma de pago:</span> <span class="value">{{ factura.forma_pago }}</span><br>
                 <span class="label">Medio de Pago:</span> <span class="value">{{ factura.medio_pago }}</span><br>
-                <span class="label">Orden de pedido:</span> <span class="value"></span><br>
-                <span class="label">Fecha de orden de pedido:</span> <span class="value"></span>
+                <span class="label">Orden de pedido:</span> <span class="value">{{ factura.orden_pedido|default:"" }}</span><br>
+                <span class="label">Fecha de orden de pedido:</span> <span class="value">{{ factura.fecha_orden_pedido|date:"d/m/Y"|default:"" }}</span>
             </td>
         </tr>
     </table>
@@ -201,14 +209,14 @@
             <td style="width: 50%;">
                 <span class="label">Razón Social:</span> <span class="value">{{ factura.emisor_nombre }}</span><br>
                 <span class="label">Nit del Emisor:</span> <span class="value">{{ factura.emisor_nit }}</span><br>
-                <span class="label">Tipo de Contribuyente:</span> <span class="value">Persona Jurídica</span><br>
-                <span class="label">Régimen Fiscal:</span> <span class="value">O-13;O-23</span><br>
-                <span class="label">Responsabilidad tributaria:</span> <span class="value">01 - IVA</span>
+                <span class="label">Tipo de Contribuyente:</span> <span class="value">{{ factura.emisor_tipo_contribuyente }}</span><br>
+                <span class="label">Régimen Fiscal:</span> <span class="value">{{ factura.emisor_regimen_fiscal }}</span><br>
+                <span class="label">Responsabilidad tributaria:</span> <span class="value">{{ factura.emisor_responsabilidad_tributaria }}</span>
             </td>
             <td style="width: 50%;">
-                <span class="label">País:</span> <span class="value">Colombia</span><br>
-                <span class="label">Departamento:</span> <span class="value">No Especificado</span><br>
-                <span class="label">Municipio / Ciudad:</span> <span class="value">No Especificado</span><br>
+                <span class="label">País:</span> <span class="value">{{ factura.emisor_pais }}</span><br>
+                <span class="label">Departamento:</span> <span class="value">{{ factura.emisor_departamento }}</span><br>
+                <span class="label">Municipio / Ciudad:</span> <span class="value">{{ factura.emisor_municipio }}</span><br>
                 <span class="label">Dirección:</span> <span class="value">{{ factura.emisor_direccion }}</span><br>
                 <span class="label">Teléfono / Móvil:</span> <span class="value">{{ factura.emisor_telefono }}</span><br>
                 <span class="label">Correo:</span> <span class="value">{{ factura.emisor_correo }}</span>
@@ -224,13 +232,15 @@
         <tr>
             <td style="width: 50%;">
                 <span class="label">Nombre o Razón Social:</span> <span class="value">{{ factura.receptor_nombre }}</span><br>
-                <span class="label">Número Documento:</span> <span class="value">{{ factura.receptor_nit }}</span><br>
-                <span class="label">Tipo de Contribuyente:</span> <span class="value">Persona Natural</span><br>
-                <span class="label">Régimen fiscal:</span> <span class="value">R-99-PN</span><br>
-                <span class="label">Responsabilidad tributaria:</span> <span class="value">ZZ - No aplica</span>
+                <span class="label">Número Documento:</span> <span class="value">{{ factura.receptor_tipo_documento }} {{ factura.receptor_nit }}</span><br>
+                <span class="label">Tipo de Contribuyente:</span> <span class="value">{{ factura.receptor_tipo_contribuyente }}</span><br>
+                <span class="label">Régimen fiscal:</span> <span class="value">{{ factura.receptor_regimen_fiscal }}</span><br>
+                <span class="label">Responsabilidad tributaria:</span> <span class="value">{{ factura.receptor_responsabilidad_tributaria }}</span>
             </td>
             <td style="width: 50%;">
-                <span class="label">País:</span> <span class="value">Colombia</span><br>
+                <span class="label">País:</span> <span class="value">{{ factura.receptor_pais }}</span><br>
+                <span class="label">Departamento:</span> <span class="value">{{ factura.receptor_departamento }}</span><br>
+                <span class="label">Municipio / Ciudad:</span> <span class="value">{{ factura.receptor_municipio }}</span><br>
                 <span class="label">Dirección:</span> <span class="value">{{ factura.receptor_direccion }}</span><br>
                 <span class="label">Teléfono / Móvil:</span> <span class="value">{{ factura.receptor_telefono }}</span><br>
                 <span class="label">Correo:</span> <span class="value">{{ factura.receptor_correo }}</span>
@@ -264,14 +274,14 @@
             {% for p in factura.productos.all %}
             <tr>
                 <td>{{ forloop.counter }}</td>
-                <td>301</td>
+                <td>{{ p.codigo|default:"" }}</td>
                 <td class="text-left" style="width: 150px;">{{ p.nombre }}</td>
-                <td>94</td>
+                <td>{{ p.unidad_medida }}</td>
                 <td>{{ p.cantidad }}</td>
                 <td class="text-right">$ {{ p.valor_unitario|floatformat:"2" }}</td>
-                <td class="text-right">0,00</td>
+                <td class="text-right">{{ p.descuento|floatformat:"2" }}</td>
                 <td class="text-right">{{ p.impuesto|floatformat:"2" }}</td>
-                <td class="text-right">0,00</td>
+                <td class="text-right">{{ p.impuesto_inc|floatformat:"2" }}</td>
                 <td class="text-right">$ {{ p.total_linea|floatformat:"2" }}</td>
             </tr>
             {% empty %}
@@ -285,11 +295,11 @@
     <div class="separator"></div>
     <div class="section-title">Notas Finales</div>
     <div class="separator" style="margin-top: 0;"></div>
-    <div style="font-size: 7.5pt; line-height: 1.3;">
-        1.- Gran Contribuyente RESPONSABLES DE IVA | SOMOS AGENTES RETENEDORES DE IVA<br>
-        El ejemplar que reciba la DIAN se utilizará sólo para fines de control, verificación y fiscalización.<br>
-        CUFE: {{ factura.cufe }}
-    </div>
+    <div style="font-size: 7.5pt; line-height: 1.3; white-space: pre-wrap;">{{ factura.notas_finales|default:"" }}
+CUFE: {{ factura.cufe }}</div>
+    {% if factura.texto_legal %}
+    <div style="font-size: 7.5pt; line-height: 1.3; margin-top: 10px; white-space: pre-wrap;">{{ factura.texto_legal }}</div>
+    {% endif %}
 
     <!-- PÁGINA 2 -->
     <div class="page-break"></div>
@@ -307,9 +317,9 @@
                 <strong>Documento generado el:</strong><br>
                 {{ factura.fecha_emision|date:"d/m/Y" }}<br><br>
                 <strong>Documento validado por la DIAN:</strong><br>
-                {{ factura.fecha_emision|date:"d/m/Y" }}<br><br>
-                <strong>XML Generado por:</strong> Proveedor Tecnológico<br>
-                <strong>PDF Generado por:</strong> Solución Gratuita DIAN
+                {{ factura.fecha_validacion_dian|date:"d/m/Y"|default:factura.fecha_emision|date:"d/m/Y" }}<br><br>
+                <strong>XML Generado por:</strong> {{ factura.xml_generado_por }}<br>
+                <strong>PDF Generado por:</strong> {{ factura.pdf_generado_por }}
             </div>
         </div>
 
@@ -318,42 +328,42 @@
             <!-- Primera columna subtotales -->
             <div class="calc-col">
                 <table class="totals-table">
-                    <tr><td class="grey-bg" style="background-color: #ceeade;">MONEDA</td><td class="grey-bg" style="background-color: #ceeade; text-align: right;">COP</td></tr>
+                    <tr><td class="grey-bg" style="background-color: #99FFCC;">MONEDA</td><td class="grey-bg" style="background-color: #99FFCC; text-align: right;">{{ factura.moneda }}</td></tr>
                     <tr><td class="grey-bg">Subtotal</td><td class="val-box">{{ factura.subtotal|floatformat:"2" }}</td></tr>
-                    <tr><td class="grey-bg">Descuento detalle</td><td class="val-box">0,00</td></tr>
+                    <tr><td class="grey-bg">Descuento detalle</td><td class="val-box">{{ factura.descuento_detalle_total|floatformat:"2" }}</td></tr>
                     <tr><td class="grey-bg">Total Bruto Factura</td><td class="val-box">{{ factura.subtotal|floatformat:"2" }}</td></tr>
                     <tr><td class="grey-bg">IVA</td><td class="val-box">{{ factura.iva|floatformat:"2" }}</td></tr>
-                    <tr><td class="grey-bg">Otros impuestos</td><td class="val-box">0,00</td></tr>
-                    <tr><td class="grey-bg">Total impuesto (=)</td><td class="val-box">{{ factura.iva|floatformat:"2" }}</td></tr>
-                    <tr><td class="grey-bg">Total neto factura (=)</td><td class="val-box">{{ factura.total|floatformat:"2" }}</td></tr>
-                    <tr><td class="grey-bg">Descuento Global (-)</td><td class="val-box">0,00</td></tr>
+                    <tr><td class="grey-bg">Otros impuestos</td><td class="val-box">{{ factura.otros_impuestos|floatformat:"2" }}</td></tr>
+                    <tr><td class="grey-bg">Total impuesto (=)</td><td class="val-box">{{ factura.total_impuesto|floatformat:"2" }}</td></tr>
+                    <tr><td class="grey-bg">Total neto factura (=)</td><td class="val-box">{{ factura.total_neto|floatformat:"2" }}</td></tr>
+                    <tr><td class="grey-bg">Descuento Global (-)</td><td class="val-box">{{ factura.descuento_global|floatformat:"2" }}</td></tr>
                     <tr><td class="grey-bg">Total factura (=)</td><td class="val-box" style="font-weight: bold;">$ {{ factura.total|floatformat:"2" }}</td></tr>
                 </table>
                 <br>
                 <div class="section-title">Valores informativos</div>
                 <table class="totals-table">
                     <tr><td class="grey-bg" colspan="2">ANTICIPOS</td></tr>
-                    <tr><td>Anticipos</td><td class="val-box">0,00</td></tr>
+                    <tr><td>Anticipos</td><td class="val-box">{{ factura.anticipos|floatformat:"2" }}</td></tr>
                 </table>
             </div>
 
             <!-- Segunda columna subtotales (espejo o detalle adicional) -->
             <div class="calc-col-right">
                 <table class="totals-table">
-                    <tr><td class="grey-bg" style="background-color: #ceeade;">MONEDA</td><td class="grey-bg" style="background-color: #ceeade; text-align: right;">COP</td></tr>
+                    <tr><td class="grey-bg" style="background-color: #99FFCC;">MONEDA</td><td class="grey-bg" style="background-color: #99FFCC; text-align: right;">{{ factura.moneda }}</td></tr>
                     <tr><td class="grey-bg">Subtotal</td><td class="val-box">{{ factura.subtotal|floatformat:"2" }}</td></tr>
                     <tr><td class="grey-bg">Total Bruto Factura</td><td class="val-box">{{ factura.subtotal|floatformat:"2" }}</td></tr>
                     <tr><td class="grey-bg">IVA</td><td class="val-box">{{ factura.iva|floatformat:"2" }}</td></tr>
-                    <tr><td class="grey-bg">Total impuesto (=)</td><td class="val-box">{{ factura.iva|floatformat:"2" }}</td></tr>
-                    <tr><td class="grey-bg">Total neto factura (=)</td><td class="val-box">{{ factura.total|floatformat:"2" }}</td></tr>
+                    <tr><td class="grey-bg">Total impuesto (=)</td><td class="val-box">{{ factura.total_impuesto|floatformat:"2" }}</td></tr>
+                    <tr><td class="grey-bg">Total neto factura (=)</td><td class="val-box">{{ factura.total_neto|floatformat:"2" }}</td></tr>
                     <tr><td class="grey-bg">Total factura (=)</td><td class="val-box" style="font-weight: bold;">$ {{ factura.total|floatformat:"2" }}</td></tr>
                 </table>
                 <br>
                 <div class="section-title" style="visibility: hidden;">Valores informativos</div>
                 <table class="totals-table">
                     <tr><td class="grey-bg" colspan="2">RETENCIONES</td></tr>
-                    <tr><td>Rete fuente</td><td class="val-box">0,00</td></tr>
-                    <tr><td>Rete IVA</td><td class="val-box">0,00</td></tr>
+                    <tr><td>Rete fuente</td><td class="val-box">{{ factura.rete_fuente|floatformat:"2" }}</td></tr>
+                    <tr><td>Rete IVA</td><td class="val-box">{{ factura.rete_iva|floatformat:"2" }}</td></tr>
                 </table>
             </div>
         </div>
@@ -362,12 +372,17 @@
     <div class="clearfix" style="margin-top: 30px; font-size: 8pt;">
         <table style="width:100%; text-align: left;">
             <tr>
-                <td><strong>Número de Autorización:</strong><br>18764094886993</td>
-                <td><strong>Rango desde:</strong><br>15081476</td>
-                <td><strong>Rango hasta:</strong><br>20000000</td>
-                <td><strong>Vigencia:</strong><br>2026-12-26</td>
+                <td><strong>Número de Autorización:</strong><br>{{ factura.numero_autorizacion|default:"" }}</td>
+                <td><strong>Rango desde:</strong><br>{{ factura.rango_desde|default:"" }}</td>
+                <td><strong>Rango hasta:</strong><br>{{ factura.rango_hasta|default:"" }}</td>
+                <td><strong>Vigencia:</strong><br>{{ factura.vigencia|default:"" }}</td>
             </tr>
         </table>
+    </div>
+
+    <!-- Simulación Disclosure -->
+    <div class="simulation-footnote">
+        *Este documento es una simulación generada exclusivamente para fines de auditoría y pruebas del sistema. No tiene valor fiscal, no genera obligaciones, y no es un documento oficial validado por la DIAN.
     </div>
 
 </body>
