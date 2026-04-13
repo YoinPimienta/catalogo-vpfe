@@ -1,0 +1,54 @@
+{% extends "base_busqueda.html" %}
+{% load static %}
+
+{% block content %}
+<div class="w-100 align-self-start" style="width: 499px !important; padding: 0; margin: 0;">
+
+    <span class="d-block fw-bold mb-4 sub-title"
+        style="color: #262944; font-size: 22px; font-family: 'Work Sans', sans-serif; display: block;">Buscar
+        documento</span>
+
+    <p class="mb-4"
+        style="color: #333333; font-size: 14px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">Por favor
+        diligencia los siguientes datos:</p>
+
+    <form method="POST" action="" style="width: 100%; min-height: 149px;" id="searchForm">
+        {% csrf_token %}
+        <div class="mb-2 mt-4">
+            <label for="cufeInput" class="form-label mb-1"
+                style="color: #333333; font-size: 14px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">CUFE
+                o UUID</label>
+            <input type="text"
+                class="form-control rounded-1 {% if error %}is-invalid border-danger{% else %}border-secondary-subtle{% endif %}"
+                id="cufeInput" name="cufe" placeholder="Ingrese el código CUFE o UUID"
+                style="font-size: 14px; padding: 10px 16px; width: 450px; border-width: 1.9px; height: auto;"
+                value="" autocomplete="off">
+            {% if error %}
+            <div class="invalid-feedback d-block mt-1"
+                style="font-size: 14px; color: #dc3545; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                {{ error }}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="mt-4">
+            <button type="submit" class="btn btn-success fw-bold dian-btn-search">Buscar</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Detectar si hay un parámetro CUFE en la URL y pegarlo en el input
+    document.addEventListener('DOMContentLoaded', function() {
+        const params = new URLSearchParams(window.location.search);
+        const cufe = params.get('cufe');
+        
+        if (cufe) {
+            const cufeInput = document.getElementById('cufeInput');
+            cufeInput.value = cufe;
+            cufeInput.focus();
+        }
+    });
+</script>
+
+{% endblock %}
