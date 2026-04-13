@@ -30,7 +30,7 @@ def descargar_pdf_factura(request, cufe):
         html_string = render_to_string('factura_pdf.html', {'factura': factura, 'request': request})
         
         # Generar el PDF
-        pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
+        pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri('/')).write_pdf()
         
         current_serie = factura.serie if factura.serie else "I0"
         current_folio = factura.folio if factura.folio else "00"
@@ -40,6 +40,11 @@ def descargar_pdf_factura(request, cufe):
         return response
     except Factura.DoesNotExist:
         return HttpResponse("Factura no encontrada.", status=404)
+    except Exception as e:
+        import traceback
+        error_msg = f"Error generando PDF: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+        print(error_msg)
+        return HttpResponse(error_msg, status=500, content_type="text/plain")
 
 from django.contrib.auth.models import User
 
