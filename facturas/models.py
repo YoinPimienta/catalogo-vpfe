@@ -133,10 +133,10 @@ class Producto(models.Model):
 
     @property
     def _porcentaje_inc_interno(self):
+        # El impuesto debe calcularse y mostrarse correctamente dentro de ese total...
+        # aplicándolo solo cuando corresponda (es decir, cuando esté explícitamente > 0 en el campo).
         if 0 < self.impuesto_inc < 100:
             return self.impuesto_inc
-        if self.impuesto == 0 and self.impuesto_inc == 0:
-            return 8  # Por defecto 8% INC si está en 0.00
         return 0
 
     @property
