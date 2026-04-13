@@ -1,5 +1,6 @@
 from django.db import models
 from datetime import date
+from decimal import Decimal
 import uuid
 import qrcode
 from io import BytesIO
@@ -129,47 +130,49 @@ class Producto(models.Model):
 
     @property
     def _porcentaje_iva_interno(self):
-        return self.impuesto if (0 < self.impuesto < 100) else 0
+        # El impuesto debe calcularse y mostrarse correctamente dentro de ese total...
+        # aplicándolo solo cuando corresponda (es decir, cuando esté explícitamente > 0 en el campo).
+        if Decimal('0') < self.impuesto < Decimal('100'):
+            return self.impuesto
+        return Decimal('0')
 
     @property
     def _porcentaje_inc_interno(self):
-        # El impuesto debe calcularse y mostrarse correctamente dentro de ese total...
-        # aplicándolo solo cuando corresponda (es decir, cuando esté explícitamente > 0 en el campo).
-        if 0 < self.impuesto_inc < 100:
+        if Decimal('0') < self.impuesto_inc < Decimal('100'):
             return self.impuesto_inc
-        return 0
+        return Decimal('0')
 
     @property
     def base_linea(self):
         # Si el usuario ingresó un valor final, extraemos los impuestos
-        if self.impuesto >= 100 or self.impuesto_inc >= 100:
+        if self.impuesto >= Decimal('100') or self.impuesto_inc >= Decimal('100'):
             return (self.valor_unitario * self.cantidad) - self.impuesto - self.impuesto_inc
             
-        factor = 1 + (self._porcentaje_iva_interno / 100) + (self._porcentaje_inc_interno / 100)
+        factor = Decimal('1') + (self._porcentaje_iva_interno / Decimal('100')) + (self._porcentaje_inc_interno / Decimal('100'))
         return (self.valor_unitario * self.cantidad) / factor
 
     @property
     def monto_iva(self):
-        if self.impuesto >= 100:
+        if self.impuesto >= Decimal('100'):
             return self.impuesto
-        return self.base_linea * (self._porcentaje_iva_interno / 100)
+        return self.base_linea * (self._porcentaje_iva_interno / Decimal('100'))
 
     @property
     def monto_inc(self):
-        if self.impuesto_inc >= 100:
+        if self.impuesto_inc >= Decimal('100'):
             return self.impuesto_inc
-        return self.base_linea * (self._porcentaje_inc_interno / 100)
+        return self.base_linea * (self._porcentaje_inc_interno / Decimal('100'))
 
     @property
     def porcentaje_iva(self):
-        if self.impuesto >= 100 and self.base_linea > 0:
-            return (self.impuesto / self.base_linea) * 100
+        if self.impuesto >= Decimal('100') and self.base_linea > Decimal('0'):
+            return (self.impuesto / self.base_linea) * Decimal('100')
         return self._porcentaje_iva_interno
 
     @property
     def porcentaje_inc(self):
-        if self.impuesto_inc >= 100 and self.base_linea > 0:
-            return (self.impuesto_inc / self.base_linea) * 100
+        if self.impuesto_inc >= Decimal('100') and self.base_linea > Decimal('0'):
+            return (self.impuesto_inc / self.base_linea) * Decimal('100')
         return self._porcentaje_inc_interno
 
     @property
