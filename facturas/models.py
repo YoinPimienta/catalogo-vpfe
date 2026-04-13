@@ -128,36 +128,39 @@ class Producto(models.Model):
     total_linea = models.DecimalField(max_digits=15, decimal_places=2, blank=True)
 
     @property
-    def base_linea(self):
-        return (self.valor_unitario * self.cantidad) - self.impuesto - self.impuesto_inc
-
-    @property
-    def precio_base_unitario(self):
-        if self.cantidad and self.cantidad > 0:
-            return self.base_linea / self.cantidad
-        return 0
-
-    @property
-    def precio_unitario_venta(self):
-        if self.cantidad and self.cantidad > 0:
-            return (self.base_linea - self.descuento) / self.cantidad
-        return 0
-
-    @property
     def porcentaje_iva(self):
-        if self.base_linea > 0 and self.impuesto > 0:
-            return (self.impuesto / self.base_linea) * 100
-        return 0
+        return self.impuesto
 
     @property
     def porcentaje_inc(self):
-        if self.base_linea > 0 and self.impuesto_inc > 0:
-            return (self.impuesto_inc / self.base_linea) * 100
-        return 0
+        return self.impuesto_inc
+
+    @property
+    def base_linea(self):
+        # El precio_unitario tiene el impuesto incluido. Extraemos la base imponible.
+        factor = 1 + (self.impuesto / 100) + (self.impuesto_inc / 100)
+        return (self.valor_unitario * self.cantidad) / factor
+
+    @property
+    def monto_iva(self):
+        return self.base_linea * (self.impuesto / 100)
+
+    @property
+    def monto_inc(self):
+        return self.base_linea * (self.impuesto_inc / 100)
+
+    @property
+    def precio_base_unitario(self):
+        # El usuario requiere que se muestre el precio con impuesto en esta columna ("NO cambia")
+        return self.valor_unitario
+
+    @property
+    def precio_unitario_venta(self):
+        # El usuario requiere que se muestre el precio de venta igual al ingresado
+        return self.valor_unitario
 
     def save(self, *args, **kwargs):
         if not self.total_linea:
-            # El valor_unitario ya incluye los impuestos.
             self.total_linea = (self.valor_unitario * self.cantidad) - self.descuento
         super().save(*args, **kwargs)
         self.actualizar_totales_factura()
@@ -172,12 +175,12 @@ class Producto(models.Model):
         factura = factura_obj or self.factura
         productos = factura.productos.all()
         
-        # El valor total de cada producto ya tiene impuestos. 
-        # La base imponible (subtotal) se descompone restando los impuestos.
-        subtotal = sum(((p.valor_unitario * p.cantidad) - p.impuesto - p.impuesto_inc) for p in productos)
+        # El valor total de cada producto ya tiene impuestos.
+        # Descomponemos para obtener los montos reales
+        subtotal = sum(p.base_linea for p in productos)
         descuento_detalle = sum(p.descuento for p in productos)
-        iva = sum(p.impuesto for p in productos)
-        inc = sum(p.impuesto_inc for p in productos)
+        iva = sum(p.monto_iva for p in productos)
+        inc = sum(p.monto_inc for p in productos)
         
         # Totales auto-calculados
         total_bruto = subtotal

@@ -78,15 +78,15 @@
             margin-bottom: 15px;
         }
         table.items th {
-            background-color: #c9ebd4;
-            border: 1px solid #c9ebd4;
-            color: #111;
+            background-color: #99FFCC;
+            border: 1px solid #5BD1A3;
+            color: #000;
             padding: 4px;
             text-align: center;
             font-weight: bold;
         }
         table.items td {
-            border: 1px solid #c9ebd4;
+            border: 1px solid #5BD1A3;
             padding: 4px;
             text-align: center;
         }
@@ -100,14 +100,14 @@
         }
         .totals-table td {
             padding: 3px 5px;
-            border: 1px solid #aaaaaa;
+            border: 1px solid #888888;
         }
         .totals-table td.grey-bg {
             background-color: #E8ECEE;
             font-weight: bold;
         }
         .totals-table td.green-bg {
-            background-color: #c9ebd4;
+            background-color: #99FFCC;
             font-weight: bold;
         }
         .totals-table td.val-box {
@@ -266,7 +266,7 @@
                 <th rowspan="2">Precio unitario</th>
                 <th rowspan="2">Descuento detalle</th>
                 <th rowspan="2">Recargo detalle</th>
-                <th colspan="4">IMPUESTOS</th>
+                <th colspan="4" style="border-bottom: 1px solid #5BD1A3;">IMPUESTOS</th>
                 <th rowspan="2">Precio unitario de<br>venta</th>
             </tr>
             <tr>
@@ -284,14 +284,14 @@
                 <td class="text-left" style="width: 150px;">{{ p.nombre }}</td>
                 <td>{{ p.unidad_medida }}</td>
                 <td>{{ p.cantidad|floatformat:"2" }}</td>
-                <td class="text-right">$ {{ p.precio_base_unitario|floatformat:"2" }}</td>
-                <td class="text-right">$ {{ p.descuento|floatformat:"2" }}</td>
-                <td class="text-right">$ 0,00</td>
-                <td class="text-right">{% if p.impuesto %}$ {{ p.impuesto|floatformat:"2" }}{% endif %}</td>
+                <td class="text-right"><span style="float:left;">$</span> {{ p.precio_base_unitario|floatformat:"2" }}</td>
+                <td class="text-right"><span style="float:left;">$</span> {{ p.descuento|floatformat:"2" }}</td>
+                <td class="text-right"><span style="float:left;">$</span> 0,00</td>
+                <td class="text-right">{% if p.monto_iva %}<span style="float:left;">$</span> {{ p.monto_iva|floatformat:"2" }}{% endif %}</td>
                 <td class="text-right">{% if p.porcentaje_iva %}{{ p.porcentaje_iva|floatformat:"2" }}{% endif %}</td>
-                <td class="text-right">{% if p.impuesto_inc %}$ {{ p.impuesto_inc|floatformat:"2" }}{% endif %}</td>
+                <td class="text-right">{% if p.monto_inc %}<span style="float:left;">$</span> {{ p.monto_inc|floatformat:"2" }}{% endif %}</td>
                 <td class="text-right">{% if p.porcentaje_inc %}{{ p.porcentaje_inc|floatformat:"2" }}{% endif %}</td>
-                <td class="text-right">$ {{ p.precio_unitario_venta|floatformat:"2" }}</td>
+                <td class="text-right"><span style="float:left;">$</span> {{ p.precio_unitario_venta|floatformat:"2" }}</td>
             </tr>
             {% empty %}
             <tr>
