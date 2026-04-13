@@ -150,15 +150,16 @@ class Producto(models.Model):
 
     @property
     def _porcentaje_iva_interno(self):
-        return self.impuesto if Decimal('0') < self.impuesto < Decimal('100') else Decimal('0')
+        iva = self.impuesto if Decimal('0') < self.impuesto < Decimal('100') else Decimal('0')
+        inc = self.impuesto_inc if Decimal('0') < self.impuesto_inc < Decimal('100') else Decimal('0')
+        # Regla clave: Si incluye impuesto, y ambos son 0, asume IVA = 19%
+        if self.precio_incluye_impuesto and iva == Decimal('0') and inc == Decimal('0'):
+            return Decimal('19')
+        return iva
 
     @property
     def _porcentaje_inc_interno(self):
-        inc = self.impuesto_inc if Decimal('0') < self.impuesto_inc < Decimal('100') else Decimal('0')
-        # Regla clave: Si incluye impuesto, y ambos son 0, asume INC = 8%
-        if self.precio_incluye_impuesto and self._porcentaje_iva_interno == Decimal('0') and inc == Decimal('0'):
-            return Decimal('8')
-        return inc
+        return self.impuesto_inc if Decimal('0') < self.impuesto_inc < Decimal('100') else Decimal('0')
 
     @property
     def base_linea(self):
