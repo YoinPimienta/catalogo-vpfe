@@ -5,7 +5,7 @@ from django.utils.html import format_html
 class ProductoInline(admin.TabularInline):
     model = Producto
     extra = 1
-    fields = ('codigo', 'nombre', 'unidad_medida', 'cantidad', 'valor_unitario', 'descuento', 'impuesto', 'impuesto_inc', 'total_linea')
+    fields = ('codigo', 'nombre', 'unidad_medida', 'cantidad', 'valor_unitario', 'precio_incluye_impuesto', 'descuento', 'impuesto', 'impuesto_inc', 'total_linea')
     readonly_fields = ('total_linea',)
 
 @admin.register(Factura)
