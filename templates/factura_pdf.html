@@ -120,9 +120,8 @@
             background-color: #99FFCC;
         }
         .qr-section {
-            width: 100%;
-            clear: both;
-            margin-top: 30px;
+            width: 25%;
+            float: left;
         }
         .qr-image {
             width: 120px;
@@ -130,12 +129,13 @@
             margin-bottom: 5px;
         }
         .qr-text {
-            font-size: 7pt;
+            font-size: 7.5pt;
             line-height: 1.2;
             word-wrap: break-word;
         }
         .calc-wrapper {
-            width: 100%;
+            width: 73%;
+            float: right;
         }
         .calc-col {
             width: 48%;
@@ -323,7 +323,24 @@ CUFE: {{ factura.cufe }}</div>
     <div class="separator" style="margin-top: 0;"></div>
 
     <div class="clearfix" style="margin-top: 15px;">
-        <!-- Tablas de totales -->
+        <!-- Lado Izquierdo: QR -->
+        <div class="qr-section">
+            {% if factura.qr_code %}
+            <img src="{{ factura.qr_code }}" class="qr-image" alt="QR">
+            {% endif %}
+            <div class="qr-text">
+                <p><strong>Documento generado el:</strong><br>
+                {{ factura.fecha_emision|date:"d/m/Y" }}</p>
+                <p><strong>Documento validado por la DIAN:</strong><br>
+                {{ factura.fecha_validacion_dian|date:"d/m/Y"|default:factura.fecha_emision|date:"d/m/Y" }}</p>
+                <p><strong>XML Generado por:</strong><br>
+                {{ factura.xml_generado_por }}</p>
+                <p><strong>PDF Generado por:</strong><br>
+                {{ factura.pdf_generado_por }}</p>
+            </div>
+        </div>
+
+        <!-- Tablas de totales (Lado Derecho) -->
         <div class="calc-wrapper clearfix">
             <!-- Lado Izquierdo (Simulado / Espejo) -->
             <div class="calc-col">
@@ -397,19 +414,6 @@ CUFE: {{ factura.cufe }}</div>
                     <tr><td class="label-col">Rete IVA</td><td class="val-col">{% if factura.rete_iva %}{{ factura.rete_iva|floatformat:"2" }}{% else %}0,00{% endif %}</td></tr>
                     <tr><td class="label-col">Rete ICA</td><td class="val-col">0,00</td></tr>
                 </table>
-            </div>
-        </div>
-
-        <!-- Lado Inferior: QR (Movido abajo) -->
-        <div class="qr-section">
-            {% if factura.qr_code %}
-            <img src="{{ factura.qr_code }}" class="qr-image" alt="QR" style="float:left; margin-right: 20px;">
-            {% endif %}
-            <div class="qr-text" style="float:left; margin-top: 20px;">
-                <strong>Documento generado el:</strong> {{ factura.fecha_emision|date:"d/m/Y" }}<br>
-                <strong>Documento validado por la DIAN:</strong> {{ factura.fecha_validacion_dian|date:"d/m/Y"|default:factura.fecha_emision|date:"d/m/Y" }}<br>
-                <strong>XML Generado por:</strong> {{ factura.xml_generado_por }}<br>
-                <strong>PDF Generado por:</strong> {{ factura.pdf_generado_por }}
             </div>
         </div>
     </div>

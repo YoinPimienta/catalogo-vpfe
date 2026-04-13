@@ -95,6 +95,25 @@ class Factura(models.Model):
         if not self.qr_code:
             self.generar_qr()
 
+    def recalcular_totales(self):
+        productos = self.productos.all()
+        subtotal = sum((p.base_linea for p in productos), Decimal('0'))
+        descuento_detalle = sum((p.descuento for p in productos), Decimal('0'))
+        iva = sum((p.monto_iva for p in productos), Decimal('0'))
+        inc = sum((p.monto_inc for p in productos), Decimal('0'))
+        
+        self.subtotal = subtotal
+        self.descuento_detalle_total = descuento_detalle
+        self.iva = iva
+        self.inc_total = inc
+        self.total_impuesto = iva + inc + getattr(self, 'otros_impuestos', Decimal('0'))
+        
+        self.total_neto = self.subtotal - self.descuento_detalle_total + self.total_impuesto
+        rec = getattr(self, 'recargo_global', Decimal('0'))
+        des = getattr(self, 'descuento_global', Decimal('0'))
+        self.total = self.total_neto - des + rec
+        self.save(update_fields=['subtotal', 'descuento_detalle_total', 'iva', 'inc_total', 'total_impuesto', 'total_neto', 'total'])
+
     def generar_qr(self):
         url = f"https://catalogo-vpfe.onrender.com/?cufe={self.cufe}"
         qr = qrcode.QRCode(

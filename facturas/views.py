@@ -27,6 +27,7 @@ def descargar_pdf_factura(request, cufe):
     try:
         from weasyprint import HTML
         factura = Factura.objects.get(cufe=cufe)
+        factura.recalcular_totales()
         html_string = render_to_string('factura_pdf.html', {'factura': factura, 'request': request})
         
         # Generar el PDF
