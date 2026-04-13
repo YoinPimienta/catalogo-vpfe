@@ -142,6 +142,7 @@ class Producto(models.Model):
     unidad_medida = models.CharField(max_length=50, default="94")
     cantidad = models.PositiveIntegerField(default=1)
     valor_unitario = models.DecimalField(max_digits=15, decimal_places=2)
+    precio_incluye_impuesto = models.BooleanField(default=False)
     descuento = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     impuesto = models.DecimalField(max_digits=15, decimal_places=2, default=0) # IVA
     impuesto_inc = models.DecimalField(max_digits=15, decimal_places=2, default=0)
@@ -149,37 +150,32 @@ class Producto(models.Model):
 
     @property
     def _porcentaje_iva_interno(self):
-        # El impuesto debe calcularse y mostrarse correctamente dentro de ese total...
-        # aplicándolo solo cuando corresponda (es decir, cuando esté explícitamente > 0 en el campo).
-        if Decimal('0') < self.impuesto < Decimal('100'):
-            return self.impuesto
-        return Decimal('0')
+        return self.impuesto if Decimal('0') < self.impuesto < Decimal('100') else Decimal('0')
 
     @property
     def _porcentaje_inc_interno(self):
-        if Decimal('0') < self.impuesto_inc < Decimal('100'):
-            return self.impuesto_inc
-        return Decimal('0')
+        inc = self.impuesto_inc if Decimal('0') < self.impuesto_inc < Decimal('100') else Decimal('0')
+        # Regla clave: Si incluye impuesto, y ambos son 0, asume INC = 8%
+        if self.precio_incluye_impuesto and self._porcentaje_iva_interno == Decimal('0') and inc == Decimal('0'):
+            return Decimal('8')
+        return inc
 
     @property
     def base_linea(self):
-        # Si el usuario ingresó un valor final, extraemos los impuestos
-        if self.impuesto >= Decimal('100') or self.impuesto_inc >= Decimal('100'):
-            return (self.valor_unitario * self.cantidad) - self.impuesto - self.impuesto_inc
-            
-        factor = Decimal('1') + (self._porcentaje_iva_interno / Decimal('100')) + (self._porcentaje_inc_interno / Decimal('100'))
-        return (self.valor_unitario * self.cantidad) / factor
+        # Caso 2: El precio INCLUYE el impuesto (hay que descomponer el valor total)
+        if self.precio_incluye_impuesto:
+            factor = Decimal('1') + (self._porcentaje_iva_interno / Decimal('100')) + (self._porcentaje_inc_interno / Decimal('100'))
+            return (self.valor_unitario * self.cantidad) / factor
+        
+        # Caso 1: El precio NO incluye impuesto (el valor es la base, a la que luego se sumará el impuesto)
+        return self.valor_unitario * self.cantidad
 
     @property
     def monto_iva(self):
-        if self.impuesto >= Decimal('100'):
-            return self.impuesto
         return self.base_linea * (self._porcentaje_iva_interno / Decimal('100'))
 
     @property
     def monto_inc(self):
-        if self.impuesto_inc >= Decimal('100'):
-            return self.impuesto_inc
         return self.base_linea * (self._porcentaje_inc_interno / Decimal('100'))
 
     @property
@@ -196,13 +192,15 @@ class Producto(models.Model):
 
     @property
     def precio_base_unitario(self):
-        # El usuario requiere que se muestre el precio con impuesto en esta columna ("NO cambia")
+        if self.precio_incluye_impuesto:
+            return self.base_linea / Decimal(str(self.cantidad)) if self.cantidad else Decimal('0')
         return self.valor_unitario
 
     @property
     def precio_unitario_venta(self):
-        # El usuario requiere que se muestre el precio de venta igual al ingresado
-        return self.valor_unitario
+        if self.precio_incluye_impuesto:
+            return self.valor_unitario
+        return (self.base_linea + self.monto_iva + self.monto_inc) / Decimal(str(self.cantidad)) if self.cantidad else Decimal('0')
 
     def save(self, *args, **kwargs):
         if not self.total_linea:
