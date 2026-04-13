@@ -78,15 +78,15 @@
             margin-bottom: 15px;
         }
         table.items th {
-            background-color: #99FFCC;
-            border: 1px solid #5BD1A3;
+            background-color: #D4F0DC;
+            border: 1px solid #77C79B;
             color: #000;
-            padding: 4px;
+            padding: 5px;
             text-align: center;
             font-weight: bold;
         }
         table.items td {
-            border: 1px solid #5BD1A3;
+            border: 1px solid #77C79B;
             padding: 4px;
             text-align: center;
         }
@@ -96,26 +96,33 @@
         .totals-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 8pt;
+            font-size: 7.5pt;
+        }
+        .totals-table, .totals-table th, .totals-table td {
+            border: 1px solid #444; 
         }
         .totals-table td {
-            padding: 3px 5px;
-            border: 1px solid #888888;
+            padding: 3px 6px;
         }
-        .totals-table td.grey-bg {
-            background-color: #E8ECEE;
-            font-weight: bold;
+        .totals-table .label-col {
+            width: 65%;
+            color: #222;
         }
-        .totals-table td.green-bg {
-            background-color: #99FFCC;
-            font-weight: bold;
-        }
-        .totals-table td.val-box {
+        .totals-table .val-col {
+            width: 35%;
             text-align: right;
         }
+        .totals-table tr.grey-row td {
+            background-color: #E2E6E8;
+            font-weight: bold;
+        }
+        .totals-table tr.green-row td {
+            background-color: #D4F0DC;
+        }
         .qr-section {
-            width: 25%;
-            float: left;
+            width: 100%;
+            clear: both;
+            margin-top: 30px;
         }
         .qr-image {
             width: 120px;
@@ -128,8 +135,7 @@
             word-wrap: break-word;
         }
         .calc-wrapper {
-            width: 70%;
-            float: right;
+            width: 100%;
         }
         .calc-col {
             width: 48%;
@@ -317,95 +323,93 @@ CUFE: {{ factura.cufe }}</div>
     <div class="separator" style="margin-top: 0;"></div>
 
     <div class="clearfix" style="margin-top: 15px;">
-        <!-- Lado Izquierdo: QR -->
-        <div class="qr-section">
-            {% if factura.qr_code %}
-            <img src="{{ factura.qr_code }}" class="qr-image" alt="QR">
-            {% endif %}
-            <div class="qr-text">
-                <strong>Documento generado el:</strong><br>
-                {{ factura.fecha_emision|date:"d/m/Y" }}<br><br>
-                <strong>Documento validado por la DIAN:</strong><br>
-                {{ factura.fecha_validacion_dian|date:"d/m/Y"|default:factura.fecha_emision|date:"d/m/Y" }}<br><br>
-                <strong>XML Generado por:</strong> {{ factura.xml_generado_por }}<br>
-                <strong>PDF Generado por:</strong> {{ factura.pdf_generado_por }}
+        <!-- Tablas de totales -->
+        <div class="calc-wrapper clearfix">
+            <!-- Lado Izquierdo (Simulado / Espejo) -->
+            <div class="calc-col">
+                <table class="totals-table">
+                    <tr class="green-row"><td class="label-col">MONEDA</td><td class="val-col"></td></tr>
+                    <tr class="green-row"><td class="label-col">TASA DE CAMBIO</td><td class="val-col"></td></tr>
+                </table>
+                <div style="height: 15px;"></div>
+                <table class="totals-table">
+                    <tr class="grey-row"><td class="label-col">Subtotal</td><td class="val-col"></td></tr>
+                    <tr><td class="label-col">Descuento detalle</td><td class="val-col">0,00</td></tr>
+                    <tr><td class="label-col">Recargo detalle</td><td class="val-col">0,00</td></tr>
+                    <tr class="grey-row"><td class="label-col">Total Bruto Factura</td><td class="val-col"></td></tr>
+                    <tr><td class="label-col">IVA</td><td class="val-col">0,00</td></tr>
+                    <tr><td class="label-col">INC</td><td class="val-col"></td></tr>
+                    <tr><td class="label-col">Bolsas</td><td class="val-col">0,00</td></tr>
+                    <tr><td class="label-col">Otros impuestos</td><td class="val-col">0,00</td></tr>
+                    <tr class="grey-row"><td class="label-col">Total impuesto (=)</td><td class="val-col"></td></tr>
+                    <tr class="grey-row"><td class="label-col">Total neto factura (=)</td><td class="val-col"></td></tr>
+                    <tr><td class="label-col">Descuento Global (-)</td><td class="val-col"></td></tr>
+                    <tr><td class="label-col">Recargo Global (+)</td><td class="val-col">0,00</td></tr>
+                    <tr class="grey-row"><td class="label-col">Total factura (=)</td><td class="val-col"><span style="float: left;">$</span> $ </td></tr>
+                </table>
+                <div style="height: 15px;"></div>
+                <div style="font-size: 8pt; font-weight: bold; margin-bottom: 3px;">Valores informativos</div>
+                <table class="totals-table">
+                    <tr class="grey-row"><td colspan="2">ANTICIPOS</td></tr>
+                    <tr><td class="label-col">Anticipos</td><td class="val-col"></td></tr>
+                </table>
+                <div style="height: 15px;"></div>
+                <table class="totals-table">
+                    <tr class="grey-row"><td colspan="2">RETENCIONES</td></tr>
+                    <tr><td class="label-col">Rete fuente</td><td class="val-col">0,00</td></tr>
+                    <tr><td class="label-col">Rete IVA</td><td class="val-col">0,00</td></tr>
+                    <tr><td class="label-col">Rete ICA</td><td class="val-col">0,00</td></tr>
+                </table>
+            </div>
+
+            <!-- Lado Derecho (Valores Reales) -->
+            <div class="calc-col-right">
+                <table class="totals-table">
+                    <tr class="green-row"><td class="label-col">MONEDA</td><td class="val-col">{{ factura.moneda }}</td></tr>
+                    <tr class="green-row"><td class="label-col">TASA DE CAMBIO</td><td class="val-col"></td></tr>
+                </table>
+                <div style="height: 15px;"></div>
+                <table class="totals-table">
+                    <tr class="grey-row"><td class="label-col">Subtotal</td><td class="val-col">{{ factura.subtotal|floatformat:"2" }}</td></tr>
+                    <tr><td class="label-col">Descuento detalle</td><td class="val-col">{% if factura.descuento_detalle_total %}{{ factura.descuento_detalle_total|floatformat:"2" }}{% else %}0,00{% endif %}</td></tr>
+                    <tr><td class="label-col">Recargo detalle</td><td class="val-col">0,00</td></tr>
+                    <tr class="grey-row"><td class="label-col">Total Bruto Factura</td><td class="val-col">{{ factura.subtotal|floatformat:"2" }}</td></tr>
+                    <tr><td class="label-col">IVA</td><td class="val-col">{% if factura.iva %}{{ factura.iva|floatformat:"2" }}{% else %}0,00{% endif %}</td></tr>
+                    <tr><td class="label-col">INC</td><td class="val-col">{% if factura.inc_total %}{{ factura.inc_total|floatformat:"2" }}{% else %}0,00{% endif %}</td></tr>
+                    <tr><td class="label-col">Bolsas</td><td class="val-col">0,00</td></tr>
+                    <tr><td class="label-col">Otros impuestos</td><td class="val-col">{% if factura.otros_impuestos %}{{ factura.otros_impuestos|floatformat:"2" }}{% else %}0,00{% endif %}</td></tr>
+                    <tr class="grey-row"><td class="label-col">Total impuesto (=)</td><td class="val-col">{% if factura.total_impuesto %}{{ factura.total_impuesto|floatformat:"2" }}{% else %}0,00{% endif %}</td></tr>
+                    <tr class="grey-row"><td class="label-col">Total neto factura (=)</td><td class="val-col">{{ factura.total_neto|floatformat:"2" }}</td></tr>
+                    <tr><td class="label-col">Descuento Global (-)</td><td class="val-col">{% if factura.descuento_global %}{{ factura.descuento_global|floatformat:"2" }}{% else %}0,00{% endif %}</td></tr>
+                    <tr><td class="label-col">Recargo Global (+)</td><td class="val-col">{% if factura.recargo_global %}{{ factura.recargo_global|floatformat:"2" }}{% else %}0,00{% endif %}</td></tr>
+                    <tr class="grey-row"><td class="label-col">Total factura (=)</td><td class="val-col"><span style="float: left;">{{ factura.moneda }} $</span> $ {{ factura.total|floatformat:"2" }}</td></tr>
+                </table>
+                <div style="height: 15px;"></div>
+                <div style="font-size: 8pt; font-weight: bold; margin-bottom: 3px;">Valores informativos</div>
+                <table class="totals-table">
+                    <tr class="grey-row"><td colspan="2">ANTICIPOS</td></tr>
+                    <tr><td class="label-col">Anticipos</td><td class="val-col">{% if factura.anticipos %}{{ factura.anticipos|floatformat:"2" }}{% endif %}</td></tr>
+                </table>
+                <div style="height: 15px;"></div>
+                <table class="totals-table">
+                    <tr class="grey-row"><td colspan="2">RETENCIONES</td></tr>
+                    <tr><td class="label-col">Rete fuente</td><td class="val-col">{% if factura.rete_fuente %}{{ factura.rete_fuente|floatformat:"2" }}{% else %}0,00{% endif %}</td></tr>
+                    <tr><td class="label-col">Rete IVA</td><td class="val-col">{% if factura.rete_iva %}{{ factura.rete_iva|floatformat:"2" }}{% else %}0,00{% endif %}</td></tr>
+                    <tr><td class="label-col">Rete ICA</td><td class="val-col">0,00</td></tr>
+                </table>
             </div>
         </div>
 
-        <!-- Lado Derecho: Tablas de totales -->
-        <div class="calc-wrapper clearfix">
-            <!-- Primera columna subtotales -->
-            <div class="calc-col">
-                <table class="totals-table">
-                    <tr><td class="green-bg">MONEDA</td><td class="green-bg val-box"></td></tr>
-                    <tr><td class="green-bg">TASA DE CAMBIO</td><td class="green-bg val-box"></td></tr>
-                </table>
-                <br>
-                <table class="totals-table">
-                    <tr><td class="grey-bg">Subtotal</td><td class="val-box"></td></tr>
-                    <tr><td>Descuento detalle</td><td class="val-box">0,00</td></tr>
-                    <tr><td>Recargo detalle</td><td class="val-box">0,00</td></tr>
-                    <tr><td class="grey-bg">Total Bruto Factura</td><td class="val-box"></td></tr>
-                    <tr><td>IVA</td><td class="val-box">0,00</td></tr>
-                    <tr><td>INC</td><td class="val-box"></td></tr>
-                    <tr><td>Bolsas</td><td class="val-box">0,00</td></tr>
-                    <tr><td>Otros impuestos</td><td class="val-box">0,00</td></tr>
-                    <tr><td class="grey-bg">Total impuesto (=)</td><td class="val-box"></td></tr>
-                    <tr><td class="grey-bg">Total neto factura (=)</td><td class="val-box"></td></tr>
-                    <tr><td>Descuento Global (-)</td><td class="val-box"></td></tr>
-                    <tr><td>Recargo Global (+)</td><td class="val-box">0,00</td></tr>
-                    <tr><td class="grey-bg">Total factura (=)</td><td class="grey-bg val-box"><span style="float: left;">$</span> $ </td></tr>
-                </table>
-                <br>
-                <div class="section-title">Valores informativos</div>
-                <table class="totals-table">
-                    <tr><td class="grey-bg" colspan="2">ANTICIPOS</td></tr>
-                    <tr><td>Anticipos</td><td class="val-box"></td></tr>
-                </table>
-                <br>
-                <table class="totals-table">
-                    <tr><td class="grey-bg" colspan="2">RETENCIONES</td></tr>
-                    <tr><td>Rete fuente</td><td class="val-box">0,00</td></tr>
-                    <tr><td>Rete IVA</td><td class="val-box">0,00</td></tr>
-                    <tr><td>Rete ICA</td><td class="val-box">0,00</td></tr>
-                </table>
-            </div>
-
-            <!-- Segunda columna subtotales (espejo o detalle adicional) -->
-            <div class="calc-col-right">
-                <table class="totals-table">
-                    <tr><td class="green-bg">MONEDA</td><td class="green-bg val-box">{{ factura.moneda }}</td></tr>
-                    <tr><td class="green-bg">TASA DE CAMBIO</td><td class="green-bg val-box"></td></tr>
-                </table>
-                <br>
-                <table class="totals-table">
-                    <tr><td class="grey-bg">Subtotal</td><td class="val-box">{{ factura.subtotal|floatformat:"2" }}</td></tr>
-                    <tr><td>Descuento detalle</td><td class="val-box">{{ factura.descuento_detalle_total|floatformat:"2" }}</td></tr>
-                    <tr><td>Recargo detalle</td><td class="val-box">0,00</td></tr>
-                    <tr><td class="grey-bg">Total Bruto Factura</td><td class="val-box">{{ factura.subtotal|floatformat:"2" }}</td></tr>
-                    <tr><td>IVA</td><td class="val-box">{{ factura.iva|floatformat:"2" }}</td></tr>
-                    <tr><td>INC</td><td class="val-box">{{ factura.inc_total|floatformat:"2" }}</td></tr>
-                    <tr><td>Bolsas</td><td class="val-box">0,00</td></tr>
-                    <tr><td>Otros impuestos</td><td class="val-box">{{ factura.otros_impuestos|floatformat:"2" }}</td></tr>
-                    <tr><td class="grey-bg">Total impuesto (=)</td><td class="val-box">{{ factura.total_impuesto|floatformat:"2" }}</td></tr>
-                    <tr><td class="grey-bg">Total neto factura (=)</td><td class="val-box">{{ factura.total_neto|floatformat:"2" }}</td></tr>
-                    <tr><td>Descuento Global (-)</td><td class="val-box">{{ factura.descuento_global|floatformat:"2" }}</td></tr>
-                    <tr><td>Recargo Global (+)</td><td class="val-box">{{ factura.recargo_global|floatformat:"2" }}</td></tr>
-                    <tr><td class="grey-bg">Total factura (=)</td><td class="grey-bg val-box"><span style="float: left;">{{ factura.moneda }} $</span> $ {{ factura.total|floatformat:"2" }}</td></tr>
-                </table>
-                <br>
-                <div class="section-title">Valores informativos</div>
-                <table class="totals-table">
-                    <tr><td class="grey-bg" colspan="2">ANTICIPOS</td></tr>
-                    <tr><td>Anticipos</td><td class="val-box">{% if factura.anticipos %}{{ factura.anticipos|floatformat:"2" }}{% endif %}</td></tr>
-                </table>
-                <br>
-                <table class="totals-table">
-                    <tr><td class="grey-bg" colspan="2">RETENCIONES</td></tr>
-                    <tr><td>Rete fuente</td><td class="val-box">{{ factura.rete_fuente|floatformat:"2" }}</td></tr>
-                    <tr><td>Rete IVA</td><td class="val-box">{{ factura.rete_iva|floatformat:"2" }}</td></tr>
-                    <tr><td>Rete ICA</td><td class="val-box">0,00</td></tr>
-                </table>
+        <!-- Lado Inferior: QR (Movido abajo) -->
+        <div class="qr-section">
+            {% if factura.qr_code %}
+            <img src="{{ factura.qr_code }}" class="qr-image" alt="QR" style="float:left; margin-right: 20px;">
+            {% endif %}
+            <div class="qr-text" style="float:left; margin-top: 20px;">
+                <strong>Documento generado el:</strong> {{ factura.fecha_emision|date:"d/m/Y" }}<br>
+                <strong>Documento validado por la DIAN:</strong> {{ factura.fecha_validacion_dian|date:"d/m/Y"|default:factura.fecha_emision|date:"d/m/Y" }}<br>
+                <strong>XML Generado por:</strong> {{ factura.xml_generado_por }}<br>
+                <strong>PDF Generado por:</strong> {{ factura.pdf_generado_por }}
             </div>
         </div>
     </div>

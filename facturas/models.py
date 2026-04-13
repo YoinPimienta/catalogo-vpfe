@@ -128,26 +128,49 @@ class Producto(models.Model):
     total_linea = models.DecimalField(max_digits=15, decimal_places=2, blank=True)
 
     @property
-    def porcentaje_iva(self):
-        return self.impuesto
+    def _porcentaje_iva_interno(self):
+        return self.impuesto if (0 < self.impuesto < 100) else 0
 
     @property
-    def porcentaje_inc(self):
-        return self.impuesto_inc
+    def _porcentaje_inc_interno(self):
+        if 0 < self.impuesto_inc < 100:
+            return self.impuesto_inc
+        if self.impuesto == 0 and self.impuesto_inc == 0:
+            return 8  # Por defecto 8% INC si está en 0.00
+        return 0
 
     @property
     def base_linea(self):
-        # El precio_unitario tiene el impuesto incluido. Extraemos la base imponible.
-        factor = 1 + (self.impuesto / 100) + (self.impuesto_inc / 100)
+        # Si el usuario ingresó un valor final, extraemos los impuestos
+        if self.impuesto >= 100 or self.impuesto_inc >= 100:
+            return (self.valor_unitario * self.cantidad) - self.impuesto - self.impuesto_inc
+            
+        factor = 1 + (self._porcentaje_iva_interno / 100) + (self._porcentaje_inc_interno / 100)
         return (self.valor_unitario * self.cantidad) / factor
 
     @property
     def monto_iva(self):
-        return self.base_linea * (self.impuesto / 100)
+        if self.impuesto >= 100:
+            return self.impuesto
+        return self.base_linea * (self._porcentaje_iva_interno / 100)
 
     @property
     def monto_inc(self):
-        return self.base_linea * (self.impuesto_inc / 100)
+        if self.impuesto_inc >= 100:
+            return self.impuesto_inc
+        return self.base_linea * (self._porcentaje_inc_interno / 100)
+
+    @property
+    def porcentaje_iva(self):
+        if self.impuesto >= 100 and self.base_linea > 0:
+            return (self.impuesto / self.base_linea) * 100
+        return self._porcentaje_iva_interno
+
+    @property
+    def porcentaje_inc(self):
+        if self.impuesto_inc >= 100 and self.base_linea > 0:
+            return (self.impuesto_inc / self.base_linea) * 100
+        return self._porcentaje_inc_interno
 
     @property
     def precio_base_unitario(self):
