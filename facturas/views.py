@@ -1,7 +1,11 @@
 from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.http import HttpResponse
-from .models import Factura
+from .models import Factura, PlantillaWord
+from docxtpl import DocxTemplate, InlineImage
+from docx.shared import Mm
+import io
+import base64
 
 def buscar_factura(request):
     cufe = request.GET.get('cufe') or request.POST.get('cufe')
@@ -44,6 +48,94 @@ def descargar_pdf_factura(request, cufe):
     except Exception as e:
         import traceback
         error_msg = f"Error generando PDF: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+        print(error_msg)
+        return HttpResponse(error_msg, status=500, content_type="text/plain")
+
+def descargar_word_factura(request, cufe):
+    try:
+        factura = Factura.objects.get(cufe=cufe)
+        factura.recalcular_totales()
+        
+        # 1. Buscar plantilla
+        plantilla = PlantillaWord.objects.filter(empresa__iexact=factura.emisor_nombre, activa=True).first()
+        if not plantilla:
+            plantilla = PlantillaWord.objects.filter(por_defecto=True, activa=True).first()
+            
+        if not plantilla or not plantilla.archivo:
+            return HttpResponse("No se encontró una plantilla de Word asociada para este emisor ni una plantilla por defecto.", status=404)
+            
+        doc = DocxTemplate(plantilla.archivo.path)
+        
+        # 2. Manejar QR Base64 a Image
+        qr_image = None
+        if factura.qr_code and factura.qr_code.startswith('data:image/png;base64,'):
+            qr_b64 = factura.qr_code.split(',')[1]
+            qr_bytes = base64.b64decode(qr_b64)
+            img_stream = io.BytesIO(qr_bytes)
+            # 30 mm = 3 cm de ancho para el QR, ideal para 80mm
+            qr_image = InlineImage(doc, img_stream, width=Mm(30))
+        
+        # 3. Preparar lista de productos
+        productos = []
+        for p in factura.productos.all():
+            productos.append({
+                'nombre': p.nombre,
+                'cantidad': p.cantidad,
+                'valor_unitario': p.valor_unitario, # Podrías usar precio_unitario_venta si quieres con/sin empuesto
+                'descuento': p.descuento,
+                'total_linea': p.total_linea
+            })
+
+        # 4. Contexto de variables (placeholders)
+        context = {
+            'cufe': factura.cufe,
+            'serie': factura.serie,
+            'folio': factura.folio,
+            'fecha_emision': factura.fecha_emision.strftime('%d/%m/%Y') if factura.fecha_emision else '',
+            'fecha_vencimiento': factura.fecha_vencimiento.strftime('%d/%m/%Y') if factura.fecha_vencimiento else '',
+            
+            'emisor_nombre': factura.emisor_nombre,
+            'emisor_nit': factura.emisor_nit,
+            'emisor_direccion': factura.emisor_direccion,
+            'emisor_telefono': factura.emisor_telefono,
+            'emisor_correo': factura.emisor_correo,
+            
+            'receptor_nombre': factura.receptor_nombre,
+            'receptor_nit': factura.receptor_nit,
+            'receptor_direccion': factura.receptor_direccion,
+            'receptor_telefono': factura.receptor_telefono,
+            'receptor_correo': factura.receptor_correo,
+            
+            'subtotal': f"{factura.subtotal:,.2f}",
+            'descuento_total': f"{factura.descuento_detalle_total:,.2f}",
+            'iva': f"{factura.iva:,.2f}",
+            'inc_total': f"{factura.inc_total:,.2f}",
+            'total': f"{factura.total:,.2f}",
+            
+            'notas_finales': factura.notas_finales,
+            
+            'productos': productos,
+            'qr': qr_image if qr_image else ''
+        }
+
+        # 5. Renderizar y retornar
+        doc.render(context)
+        file_stream = io.BytesIO()
+        doc.save(file_stream)
+        file_stream.seek(0)
+
+        response = HttpResponse(
+            file_stream.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        response['Content-Disposition'] = f'attachment; filename="Factura_{factura.serie}_{factura.folio}.docx"'
+        return response
+
+    except Factura.DoesNotExist:
+        return HttpResponse("Factura no encontrada.", status=404)
+    except Exception as e:
+        import traceback
+        error_msg = f"Error generando Word: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
         print(error_msg)
         return HttpResponse(error_msg, status=500, content_type="text/plain")
 
