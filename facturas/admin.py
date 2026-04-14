@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Factura, Producto, PlantillaWord
+from .models import Factura, Producto
 from django.utils.html import format_html
 
 class ProductoInline(admin.TabularInline):
@@ -58,10 +58,4 @@ class FacturaAdmin(admin.ModelAdmin):
             return format_html('<img src="{}" style="max-height: 150px;"/>', obj.qr_code)
         return "-"
     qr_code_image.short_description = 'Vista Prev. QR'
-
-@admin.register(PlantillaWord)
-class PlantillaWordAdmin(admin.ModelAdmin):
-    list_display = ('empresa', 'por_defecto', 'activa', 'archivo')
-    list_filter = ('por_defecto', 'activa')
-    search_fields = ('empresa',)
 

@@ -244,31 +244,3 @@ class Producto(models.Model):
 
     def __str__(self):
         return self.nombre
-
-class PlantillaWord(models.Model):
-    empresa = models.CharField(
-        max_length=200, 
-        help_text="Nombre del emisor para asignar la plantilla automáticamente (ej. FRISBY, JUMBO)."
-    )
-    archivo = models.FileField(
-        upload_to='plantillas_word/', 
-        help_text="Archivo de la plantilla en formato .docx."
-    )
-    por_defecto = models.BooleanField(
-        default=False, 
-        help_text="Marcar esta plantilla como la opción por defecto si no se encuentra otra coincidencia."
-    )
-    activa = models.BooleanField(
-        default=True,
-        help_text="Indica si esta plantilla puede ser utilizada por el sistema."
-    )
-
-    def save(self, *args, **kwargs):
-        if self.por_defecto:
-            # Asegurar de que solo haya una plantilla por defecto activa
-            PlantillaWord.objects.filter(por_defecto=True).update(por_defecto=False)
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        estado = "Por Defecto" if self.por_defecto else "Específica"
-        return f"{self.empresa} ({estado})"

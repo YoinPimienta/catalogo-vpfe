@@ -1,10 +1,12 @@
 from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.http import HttpResponse
-from .models import Factura, PlantillaWord
+from django.conf import settings
+from .models import Factura
 from docxtpl import DocxTemplate, InlineImage
 from docx.shared import Mm
 import io
+import os
 import base64
 
 def buscar_factura(request):
@@ -56,15 +58,38 @@ def descargar_word_factura(request, cufe):
         factura = Factura.objects.get(cufe=cufe)
         factura.recalcular_totales()
         
-        # 1. Buscar plantilla
-        plantilla = PlantillaWord.objects.filter(empresa__iexact=factura.emisor_nombre, activa=True).first()
-        if not plantilla:
-            plantilla = PlantillaWord.objects.filter(por_defecto=True, activa=True).first()
+        # 1. Buscar plantilla local física
+        plantillas_dir = os.path.join(settings.BASE_DIR, 'plantillas_base')
+        file_path = None
+        
+        if os.path.exists(plantillas_dir):
+            emisor_upper = factura.emisor_nombre.upper()
+            # Buscar si alguna plantilla contiene el nombre del emisor
+            for filename in os.listdir(plantillas_dir):
+                if filename.endswith('.docx'):
+                    name_without_ext = filename[:-5].upper()
+                    if name_without_ext and name_without_ext in emisor_upper and name_without_ext != 'DEFECTO':
+                        file_path = os.path.join(plantillas_dir, filename)
+                        break
             
-        if not plantilla or not plantilla.archivo:
-            return HttpResponse("No se encontró una plantilla de Word asociada para este emisor ni una plantilla por defecto.", status=404)
+            # Reintento con plantilla 'defecto.docx' si no se encontró específica
+            if not file_path:
+                defecto_path = os.path.join(plantillas_dir, 'defecto.docx')
+                if os.path.exists(defecto_path):
+                    file_path = defecto_path
+
+        # Validación ESTRICTA física
+        if not file_path or not os.path.exists(file_path):
+            error_details = (
+                f"Error Crítico: El archivo físico de la plantilla no existe en el servidor para el emisor '{factura.emisor_nombre}'.\n"
+                f"Directorio de búsqueda: {plantillas_dir}\n"
+                f"Por favor asegúrate de crear la carpeta 'plantillas_base' en la raíz de tu proyecto y colocar allí los "
+                f"archivos .docx con el nombre de la empresa (Ej. 'FRISBY.docx') o uno llamado 'defecto.docx' como respaldo."
+            )
+            print(error_details)
+            return HttpResponse(error_details, status=404, content_type="text/plain")
             
-        doc = DocxTemplate(plantilla.archivo.path)
+        doc = DocxTemplate(file_path)
         
         # 2. Manejar QR Base64 a Image
         qr_image = None
