@@ -75,15 +75,23 @@ def descargar_word_factura(request, cufe):
             # 30 mm = 3 cm de ancho para el QR, ideal para 80mm
             qr_image = InlineImage(doc, img_stream, width=Mm(30))
         
+        # Función auxiliar para formatear los números (si no tiene decimales lo deja como int, sino como float)
+        def no_zeros(val):
+            if val is None:
+                return 0
+            float_val = float(val)
+            return int(float_val) if float_val.is_integer() else float_val
+
         # 3. Preparar lista de productos
         productos = []
         for p in factura.productos.all():
             productos.append({
                 'nombre': p.nombre,
-                'cantidad': p.cantidad,
-                'valor_unitario': p.valor_unitario, # Podrías usar precio_unitario_venta si quieres con/sin empuesto
-                'descuento': p.descuento,
-                'total_linea': p.total_linea
+                'cantidad': no_zeros(p.cantidad),
+                'valor_unitario': no_zeros(p.valor_unitario),
+                'precio_unitario_venta': no_zeros(p.precio_unitario_venta),
+                'descuento': no_zeros(p.descuento),
+                'total_linea': no_zeros(p.total_linea)
             })
 
         # 4. Contexto de variables (placeholders)
@@ -94,6 +102,15 @@ def descargar_word_factura(request, cufe):
             'fecha_emision': factura.fecha_emision.strftime('%d/%m/%Y') if factura.fecha_emision else '',
             'fecha_vencimiento': factura.fecha_vencimiento.strftime('%d/%m/%Y') if factura.fecha_vencimiento else '',
             
+            'forma_pago': factura.forma_pago,
+            'medio_pago': factura.medio_pago,
+            
+            'rango_desde': factura.rango_desde,
+            'rango_hasta': factura.rango_hasta,
+            'numero_autorizacion': factura.numero_autorizacion,
+            'vigencia': factura.vigencia,
+            'xml_generado_por': factura.xml_generado_por,
+
             'emisor_nombre': factura.emisor_nombre,
             'emisor_nit': factura.emisor_nit,
             'emisor_direccion': factura.emisor_direccion,
@@ -106,11 +123,12 @@ def descargar_word_factura(request, cufe):
             'receptor_telefono': factura.receptor_telefono,
             'receptor_correo': factura.receptor_correo,
             
-            'subtotal': f"{factura.subtotal:,.2f}",
-            'descuento_total': f"{factura.descuento_detalle_total:,.2f}",
-            'iva': f"{factura.iva:,.2f}",
-            'inc_total': f"{factura.inc_total:,.2f}",
-            'total': f"{factura.total:,.2f}",
+            'subtotal': no_zeros(factura.subtotal),
+            'descuento_total': no_zeros(factura.descuento_detalle_total),
+            'total_impuesto': no_zeros(factura.total_impuesto),
+            'iva': no_zeros(factura.iva),
+            'inc_total': no_zeros(factura.inc_total),
+            'total': no_zeros(factura.total),
             
             'notas_finales': factura.notas_finales,
             
