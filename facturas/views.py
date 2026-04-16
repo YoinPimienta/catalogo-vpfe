@@ -15,11 +15,15 @@ def buscar_factura(request):
     factura = None
 
     if request.method == 'POST' and cufe:
+        cufe_clean = str(cufe).strip()
         try:
-            factura = Factura.objects.get(cufe=cufe)
+            factura = Factura.objects.get(cufe=cufe_clean)
             return render(request, 'factura_detalle.html', {'factura': factura})
         except Factura.DoesNotExist:
             error = "Documento no encontrado. Verifique el código ingresado e intente nuevamente."
+        except Exception as e:
+            print("Error interno al buscar factura:", e)
+            error = "Ocurrió un error inesperado al procesar la búsqueda."
 
     return render(request, 'buscar.html', {'error': error, 'cufe': cufe})
 def ver_factura(request, cufe):
