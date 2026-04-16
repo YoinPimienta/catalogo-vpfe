@@ -14,11 +14,14 @@ class FacturaAdmin(admin.ModelAdmin):
     search_fields = ('cufe', 'serie', 'folio', 'emisor_nombre', 'receptor_nombre', 'emisor_nit')
     list_filter = ('estado', 'fecha_emision')
     inlines = [ProductoInline]
-    readonly_fields = ('qr_code', 'qr_code_image', 'subtotal', 'descuento_detalle_total', 'iva', 'inc_total', 'total_impuesto', 'total_neto', 'total')
+    readonly_fields = ('qr_code', 'qr_code_image', 'subtotal', 'descuento_detalle_total', 'iva', 'inc_total', 'total_impuesto', 'total_neto', 'total', 'descargar_word')
+    
+    class Media:
+        js = ('admin/js/auto_fill_emisor.js',)
     
     fieldsets = (
         ('Identificación del Documento', {
-            'fields': ('cufe', 'estado', 'serie', 'folio', 'fecha_emision', 'fecha_vencimiento', 'tipo_operacion', 'forma_pago', 'medio_pago', 'orden_pedido', 'fecha_orden_pedido')
+            'fields': ('cufe', 'descargar_word', 'estado', 'serie', 'folio', 'fecha_emision', 'fecha_vencimiento', 'tipo_operacion', 'forma_pago', 'medio_pago', 'orden_pedido', 'fecha_orden_pedido')
         }),
         ('Datos del Emisor', {
             'fields': ('emisor_nombre', 'emisor_nit', 'emisor_tipo_contribuyente', 'emisor_regimen_fiscal', 'emisor_responsabilidad_tributaria', 'emisor_pais', 'emisor_departamento', 'emisor_municipio', 'emisor_direccion', 'emisor_telefono', 'emisor_correo')
@@ -58,4 +61,15 @@ class FacturaAdmin(admin.ModelAdmin):
             return format_html('<img src="{}" style="max-height: 150px;"/>', obj.qr_code)
         return "-"
     qr_code_image.short_description = 'Vista Prev. QR'
+
+    def descargar_word(self, obj):
+        if obj.pk and obj.cufe:
+            from django.urls import reverse
+            url = reverse('descargar_word_factura', args=[obj.cufe])
+            return format_html(
+                '<a class="button" href="{}" style="background-color: #417690; color: white; padding: 10px 15px; border-radius: 4px; text-decoration: none; font-weight: bold;">📥 Descargar Word (80mm)</a>',
+                url
+            )
+        return "Guarde la factura primero para generar el Word"
+    descargar_word.short_description = 'Descargar Word 80mm'
 

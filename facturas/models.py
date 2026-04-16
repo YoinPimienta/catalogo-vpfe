@@ -21,7 +21,12 @@ class Factura(models.Model):
     fecha_emision = models.DateField(default=date.today)
     fecha_vencimiento = models.DateField(null=True, blank=True)
     tipo_operacion = models.CharField(max_length=100, default="10 - Estándar")
-    forma_pago = models.CharField(max_length=50, default="Contado")
+    FORMAS_PAGO = [
+        ('Efectivo', 'Efectivo'),
+        ('Tarjeta de Débito', 'Tarjeta de Débito'),
+        ('Contado', 'Contado - Histórico'),
+    ]
+    forma_pago = models.CharField(max_length=50, choices=FORMAS_PAGO, default="Efectivo")
     medio_pago = models.CharField(max_length=50, default="Efectivo")
     orden_pedido = models.CharField(max_length=100, blank=True, null=True)
     fecha_orden_pedido = models.DateField(null=True, blank=True)

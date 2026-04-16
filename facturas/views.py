@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.template.loader import render_to_string
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.conf import settings
 from .models import Factura
 from docxtpl import DocxTemplate, InlineImage
@@ -198,3 +198,24 @@ def crear_admin(request):
 
     except Exception as e:
         return HttpResponse(f"Error creando admin: {str(e)}", status=500)
+
+def buscar_datos_emisor(request):
+    emisor_nombre = request.GET.get('emisor_nombre', '')
+    if emisor_nombre:
+        # Obtain the most recent Factura with roughly the same emisor
+        factura = Factura.objects.filter(emisor_nombre__icontains=emisor_nombre).order_by('-id').first()
+        if factura:
+            data = {
+                'emisor_nit': factura.emisor_nit,
+                'emisor_tipo_contribuyente': factura.emisor_tipo_contribuyente,
+                'emisor_regimen_fiscal': factura.emisor_regimen_fiscal,
+                'emisor_responsabilidad_tributaria': factura.emisor_responsabilidad_tributaria,
+                'emisor_pais': factura.emisor_pais,
+                'emisor_departamento': factura.emisor_departamento,
+                'emisor_municipio': factura.emisor_municipio,
+                'emisor_direccion': factura.emisor_direccion,
+                'emisor_telefono': factura.emisor_telefono,
+                'emisor_correo': factura.emisor_correo,
+            }
+            return JsonResponse(data)
+    return JsonResponse({})

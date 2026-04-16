@@ -7,5 +7,6 @@ urlpatterns = [
     path('factura/<str:cufe>/pdf/', views.descargar_pdf_factura, name='descargar_pdf_factura'),
     path('factura/<str:cufe>/word/', views.descargar_word_factura, name='descargar_word_factura'),
     path('crear-admin/', views.crear_admin),
+    path('api/emisor-data/', views.buscar_datos_emisor, name='buscar_datos_emisor'),
 ]
 
