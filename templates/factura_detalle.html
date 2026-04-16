@@ -42,24 +42,24 @@
                 <img src="{% static 'img/Dian_logo_sin_texto.jpg' %}" style="height: 45px; margin-bottom: 8px;"
                     alt="DIAN">
                 <div style="font-weight: bold; color: #333;">CUFE:</div>
-                <div style="word-break: break-all;">{% if factura %}{{ factura.cufe }}{% else                     %}0d0713b75ab55cd881246ad25f40daa5772ccc1466c40f272c546231d249dd3c3fd353182390fdccf7961cd0a876c66a{%                     endif %}</div>
+                <div style="word-break: break-all;">{% if factura %}{{ factura.cufe }}{% else
+                    %}0d0713b75ab55cd881246ad25f40daa5772ccc1466c40f272c546231d249dd3c3fd353182390fdccf7961cd0a876c66a{%
+                    endif %}</div>
             </div>
 
             <div
                 style="text-align: right; font-size: 11px; color: #333; line-height: 1.4; font-family: Arial, sans-serif;">
                 <div style="font-weight: bold; font-size: 13px; text-transform: uppercase;">Factura electrónica</div>
-                <div style="color: #555;">Serie: <strong>{% if factura %}{{ factura.serie }}{% else %}I041{% endif                         %}</strong></div>
-                <div style="color: #555;">Folio: <strong>{% if factura %}{{ factura.folio }}{% else %}15129088{% endif                         %}</strong></div>
-                <div style="color: #555;">Fecha de emisión: <strong>{% if factura %}{{                         factura.fecha_emision|date:"d-m-Y" }}{% else %}26-03-2026{% endif %}</strong></div>
+                <div style="color: #555;">Serie: <strong>{% if factura %}{{ factura.serie }}{% else %}I041{% endif
+                        %}</strong></div>
+                <div style="color: #555;">Folio: <strong>{% if factura %}{{ factura.folio }}{% else %}15129088{% endif
+                        %}</strong></div>
+                <div style="color: #555;">Fecha de emisión: <strong>{% if factura %}{{
+                        factura.fecha_emision|date:"d-m-Y" }}{% else %}26-03-2026{% endif %}</strong></div>
                 <div style="margin-top: 8px;">
                     <a href="{% url 'descargar_pdf_factura' factura.cufe %}" target="_blank"
                         style="color: #005A9C; text-decoration: none; font-weight: bold; font-size: 11px; margin-right: 15px;">
                         <i class="bi bi-file-earmark-pdf"></i> Descargar PDF
-                    </a>
-                    <a href="{% url 'descargar_word_factura' factura.cufe %}" target="_blank"
-                        style="color: #1a73e8; text-decoration: none; font-weight: bold; font-size: 11px;">
-                        <i class="bi bi-file-earmark-word"></i> Descargar Word (80mm)
-                    </a>
                 </div>
             </div>
         </div>
@@ -73,7 +73,8 @@
                 <div
                     style="font-weight: bold; color: #333; text-transform: uppercase; margin-bottom: 6px; font-size: 11px;">
                     DATOS DEL EMISOR</div>
-                <div style="color: #555; margin-bottom: 2px;">NIT: <strong>{% if factura %}{{ factura.emisor_nit }}{%                         else %}891408584{% endif %}</strong></div>
+                <div style="color: #555; margin-bottom: 2px;">NIT: <strong>{% if factura %}{{ factura.emisor_nit }}{%
+                        else %}891408584{% endif %}</strong></div>
                 <div style="color: #555;">Nombre: <strong>{% if factura %}{{ factura.emisor_nombre }}{% else %}FRISBY
                         S.A. BIC{% endif %}</strong></div>
             </div>
@@ -81,7 +82,8 @@
                 <div
                     style="font-weight: bold; color: #333; text-transform: uppercase; margin-bottom: 6px; font-size: 11px;">
                     DATOS DEL RECEPTOR</div>
-                <div style="color: #555; margin-bottom: 2px;">NIT: <strong>{% if factura %}{{ factura.receptor_nit }}{%                         else %}7108376{% endif %}</strong></div>
+                <div style="color: #555; margin-bottom: 2px;">NIT: <strong>{% if factura %}{{ factura.receptor_nit }}{%
+                        else %}7108376{% endif %}</strong></div>
                 <div style="color: #555;">Nombre: <strong>{% if factura %}{{ factura.receptor_nombre }}{% else %}DANI
                         QUINTERO{% endif %}</strong></div>
             </div>
@@ -89,8 +91,10 @@
                 <div
                     style="font-weight: bold; color: #333; text-transform: uppercase; margin-bottom: 6px; font-size: 11px;">
                     TOTALES E IMPUESTOS</div>
-                <div style="color: #555; margin-bottom: 2px;">IVA: $<strong>{% if factura %}{{                         factura.iva|floatformat:"0" }}{% else %}0{% endif %}</strong></div>
-                <div style="color: #333; font-size: 12px; font-weight: bold; margin-top: 4px;">Total: ${% if factura                     %}{{ factura.total|floatformat:"0" }}{% else %}58,000{% endif %}</div>
+                <div style="color: #555; margin-bottom: 2px;">IVA: $<strong>{% if factura %}{{
+                        factura.iva|floatformat:"0" }}{% else %}0{% endif %}</strong></div>
+                <div style="color: #333; font-size: 12px; font-weight: bold; margin-top: 4px;">Total: ${% if factura
+                    %}{{ factura.total|floatformat:"0" }}{% else %}58,000{% endif %}</div>
             </div>
         </div>
 
@@ -122,7 +126,8 @@
 
                 <div
                     style="flex: 1; text-align: center; color: #555; font-size: 16px; font-family: Arial, sans-serif; margin-top: -30px;">
-                    Legítimo Tenedor actual: <span style="color: #666;">{{ factura.emisor_nombre|default:"FRISBY S.A.                         BIC" }}</span> </div>
+                    Legítimo Tenedor actual: <span style="color: #666;">{{ factura.emisor_nombre|default:"FRISBY S.A.
+                        BIC" }}</span> </div>
             </div>
         </div>
 
