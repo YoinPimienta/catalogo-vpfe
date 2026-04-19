@@ -57,30 +57,57 @@ def descargar_pdf_factura(request, cufe):
         print(error_msg)
         return HttpResponse(error_msg, status=500, content_type="text/plain")
 
+import unicodedata
+
+PLANTILLA_ALIASES = {
+    "EXITO": ["EXITO", "ALMACENES EXITO", "ALMACENES EXITO SA", "ALMACENES EXITO S.A"],
+    "FRISBY": ["FRISBY", "FRISBY SA", "FRISBY S.A", "FRISBY S.A. BIC", "FRISBY BIC"],
+    "HOMECENTER": ["HOMECENTER", "SODIMAC", "SODIMAC COLOMBIA", "SODIMAC COLOMBIA SA"],
+    "JUMBO": ["JUMBO", "CENCOSUD", "CENCOSUD COLOMBIA", "CENCOSUD COLOMBIA S.A"],
+    "OLIMPICA": ["OLIMPICA", "OLIMPICA SA", "OLIMPICA S.A"]
+}
+
+def normalizar_texto(texto):
+    if not texto: return ""
+    texto_norm = unicodedata.normalize('NFKD', texto).encode('ASCII', 'ignore').decode('utf-8')
+    return texto_norm.upper().strip()
+
+def resolver_plantilla_por_emisor(emisor_nombre, plantillas_dir):
+    emisor_norm = normalizar_texto(emisor_nombre)
+    
+    # 1. Búsqueda por diccionario de alias (incluye coincidencias parciales)
+    for nombre_plantilla, alias_list in PLANTILLA_ALIASES.items():
+        for alias in alias_list:
+            if normalizar_texto(alias) in emisor_norm:
+                path = os.path.join(plantillas_dir, f"{nombre_plantilla}.docx")
+                if os.path.exists(path):
+                    return path
+
+    # 2. Búsqueda flexible en los nombres de archivos físicos .docx
+    if os.path.exists(plantillas_dir):
+        for filename in os.listdir(plantillas_dir):
+            if filename.endswith('.docx') and filename.upper() != 'DEFECTO.DOCX':
+                name_without_ext = normalizar_texto(filename[:-5])
+                if name_without_ext and name_without_ext in emisor_norm:
+                    path = os.path.join(plantillas_dir, filename)
+                    if os.path.exists(path):
+                        return path
+                        
+    # 3. Fallback a la plantilla por defecto si existe
+    defecto_path = os.path.join(plantillas_dir, 'defecto.docx')
+    if os.path.exists(defecto_path):
+        return defecto_path
+        
+    return None
+
 def descargar_word_factura(request, cufe):
     try:
         factura = Factura.objects.get(cufe=cufe)
         factura.recalcular_totales()
         
-        # 1. Buscar plantilla local física
+        # 1. Buscar plantilla local física dinámicamente
         plantillas_dir = os.path.join(settings.BASE_DIR, 'plantillas_base')
-        file_path = None
-        
-        if os.path.exists(plantillas_dir):
-            emisor_upper = factura.emisor_nombre.upper()
-            # Buscar si alguna plantilla contiene el nombre del emisor
-            for filename in os.listdir(plantillas_dir):
-                if filename.endswith('.docx'):
-                    name_without_ext = filename[:-5].upper()
-                    if name_without_ext and name_without_ext in emisor_upper and name_without_ext != 'DEFECTO':
-                        file_path = os.path.join(plantillas_dir, filename)
-                        break
-            
-            # Reintento con plantilla 'defecto.docx' si no se encontró específica
-            if not file_path:
-                defecto_path = os.path.join(plantillas_dir, 'defecto.docx')
-                if os.path.exists(defecto_path):
-                    file_path = defecto_path
+        file_path = resolver_plantilla_por_emisor(factura.emisor_nombre, plantillas_dir)
 
         # Validación ESTRICTA física
         if not file_path or not os.path.exists(file_path):
