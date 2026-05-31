@@ -1,0 +1,13 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    {% if change and original %}
+    <li>
+        <a href="{% url 'admin:facturas_factura_generar_masivo' original.pk %}" class="viewsitelink" style="background: #248080 !important; color: white !important; font-weight: bold; border-radius: 4px; padding: 3px 10px; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.15);">
+            ⚡ Generar Facturas Masivas
+        </a>
+    </li>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,463 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" type="text/css" href="{% static "admin/css/forms.css" %}" />
+<style>
+    /* Premium Modern UI for Bulk Generation Form */
+    .bulk-container {
+        max-width: 1000px;
+        margin: 20px auto;
+        font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
+    }
+    
+    /* Base Invoice Card */
+    .info-card {
+        background: linear-gradient(135deg, #1e3a47 0%, #102a36 100%);
+        color: #ffffff;
+        padding: 24px;
+        border-radius: 12px;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        position: relative;
+        overflow: hidden;
+    }
+    .info-card::after {
+        content: "";
+        position: absolute;
+        top: -50%;
+        right: -30%;
+        width: 300px;
+        height: 300px;
+        background: radial-gradient(circle, rgba(36, 128, 128, 0.2) 0%, transparent 70%);
+        pointer-events: none;
+    }
+    .info-card h2 {
+        margin-top: 0;
+        color: #24d2d2 !important;
+        font-size: 1.6rem;
+        font-weight: 700;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+        padding-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-top: 15px;
+    }
+    .info-item {
+        display: flex;
+        flex-direction: column;
+    }
+    .info-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: #8fa0a8;
+        margin-bottom: 4px;
+    }
+    .info-value {
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+    .info-value.highlight {
+        color: #24d2d2;
+    }
+
+    /* Main Form Layout */
+    .form-wrapper {
+        background: var(--body-bg, #ffffff);
+        border: 1px solid var(--border-color, #e0e0e0);
+        border-radius: 12px;
+        padding: 30px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    
+    .form-wrapper h3 {
+        margin-top: 0;
+        font-size: 1.3rem;
+        border-bottom: 1px solid var(--border-color, #eee);
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+        color: var(--body-quiet-color, #444);
+    }
+
+    /* Beautiful preview table */
+    .preview-box {
+        background: #f7f9fa;
+        border: 1px dashed #cbd5e1;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 25px;
+    }
+    [data-theme="dark"] .preview-box {
+        background: #1e293b;
+        border-color: #475569;
+    }
+    .preview-box h4 {
+        margin-top: 0;
+        font-size: 1.1rem;
+        color: #3b82f6;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .preview-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        font-size: 0.85rem;
+    }
+    .preview-table th, .preview-table td {
+        padding: 8px 12px;
+        text-align: left;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    [data-theme="dark"] .preview-table th, [data-theme="dark"] .preview-table td {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .preview-table th {
+        font-weight: bold;
+        color: var(--body-quiet-color, #666);
+    }
+
+    /* Custom form errors and styles */
+    .errornote-custom {
+        background-color: #fee2e2;
+        border: 1px solid #f87171;
+        color: #991b1b;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        font-weight: 600;
+    }
+    [data-theme="dark"] .errornote-custom {
+        background-color: #7f1d1d;
+        border-color: #b91c1c;
+        color: #fca5a5;
+    }
+
+    .form-group-custom {
+        margin-bottom: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .form-group-custom label {
+        font-weight: 600;
+        color: var(--body-loud-color, #333);
+        font-size: 0.9rem;
+    }
+    .form-group-custom input, .form-group-custom select {
+        padding: 10px 14px;
+        border: 1px solid var(--border-color, #ccc);
+        border-radius: 6px;
+        font-size: 0.95rem;
+        background: var(--body-bg, #fff);
+        color: var(--body-color, #333);
+        transition: border-color 0.2s, box-shadow 0.2s;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    .form-group-custom input:focus, .form-group-custom select:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        outline: none;
+    }
+    .form-group-custom .help-text {
+        font-size: 0.8rem;
+        color: var(--body-quiet-color, #666);
+        margin-top: 4px;
+    }
+    .form-group-custom .error-list {
+        color: #dc2626;
+        font-size: 0.8rem;
+        margin: 4px 0 0 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .submit-row-custom {
+        display: flex;
+        justify-content: flex-end;
+        gap: 15px;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border-color, #eee);
+    }
+    .btn {
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s;
+        border: none;
+    }
+    .btn-secondary {
+        background: #e2e8f0;
+        color: #475569;
+    }
+    .btn-secondary:hover {
+        background: #cbd5e1;
+    }
+    [data-theme="dark"] .btn-secondary {
+        background: #334155;
+        color: #cbd5e1;
+    }
+    [data-theme="dark"] .btn-secondary:hover {
+        background: #475569;
+    }
+    .btn-primary {
+        background: #248080;
+        color: white;
+        box-shadow: 0 2px 4px rgba(36, 128, 128, 0.2);
+    }
+    .btn-primary:hover {
+        background: #1c6666;
+        box-shadow: 0 4px 6px rgba(36, 128, 128, 0.3);
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+    &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+    &rsaquo; <a href="{% url 'admin:facturas_factura_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+    &rsaquo; <a href="{% url 'admin:facturas_factura_change' original.pk %}">{{ original }}</a>
+    &rsaquo; Generación Masiva
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="bulk-container">
+    {% if error_message %}
+        <div class="errornote-custom">
+            ⚠️ {{ error_message }}
+        </div>
+    {% endif %}
+
+    <!-- Factura Base Card -->
+    <div class="info-card">
+        <h2>📄 Factura Base Seleccionada</h2>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Serie y Folio</span>
+                <span class="info-value highlight">{{ original.serie }}{{ original.folio }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Receptor</span>
+                <span class="info-value">{{ original.receptor_nombre }} (NIT: {{ original.receptor_nit }})</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Fecha Emisión</span>
+                <span class="info-value">{{ original.fecha_emision|date:"d/m/Y" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Total Documento</span>
+                <span class="info-value highlight">${{ original.total|stringformat:".2f" }} COP</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Form -->
+    <div class="form-wrapper">
+        <h3>⚙️ Configuración de Generación Masiva</h3>
+        <form method="post" id="bulk-form" novalidate>
+            {% csrf_token %}
+            
+            <div class="grid-form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+                {% for field in form %}
+                    <div class="form-group-custom">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}
+                            <span class="help-text">{{ field.help_text }}</span>
+                        {% endif %}
+                        {% if field.errors %}
+                            <ul class="error-list">
+                                {% for error in field.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- Dynamic Interactive Sequence Preview Box -->
+            <div class="preview-box">
+                <h4>🔮 Vista Previa de la Secuencia a Generar</h4>
+                <p style="margin: 0 0 10px 0; font-size: 0.8rem; color: var(--body-quiet-color, #666);">
+                    Esta vista previa calcula dinámicamente cómo se distribuirán los folios y las fechas en tiempo real según tu configuración.
+                </p>
+                <div style="max-height: 250px; overflow-y: auto;">
+                    <table class="preview-table" id="preview-table">
+                        <thead>
+                            <tr>
+                                <th># Copia</th>
+                                <th>Serie</th>
+                                <th>Folio Generado</th>
+                                <th>Fecha Emisión</th>
+                                <th>Fecha Vencimiento</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: #888;">Introduce valores en el formulario para ver la vista previa.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="submit-row-custom">
+                <a href="{% url 'admin:facturas_factura_change' original.pk %}" class="btn btn-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-primary">⚡ Iniciar Generación Masiva</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const cantidadInput = document.getElementById("id_cantidad");
+        const fechaInicialInput = document.getElementById("id_fecha_inicial");
+        const facturasPorDiaInput = document.getElementById("id_facturas_por_dia");
+        const folioInicialInput = document.getElementById("id_folio_inicial");
+        const incrementoFolioInput = document.getElementById("id_incremento_folio");
+        const comportamientoVencimientoInput = document.getElementById("id_comportamiento_vencimiento");
+
+        const baseSerie = "{{ original.serie|escapejs }}";
+        const baseFolio = "{{ original.folio|escapejs }}";
+        const baseEmisionStr = "{{ original.fecha_emision|date:'Y-m-d'|escapejs }}";
+        const baseVencimientoStr = "{{ original.fecha_vencimiento|date:'Y-m-d'|escapejs }}";
+
+        // Helper to parse dates securely
+        function parseDate(str) {
+            if (!str) return null;
+            const parts = str.split("-");
+            return new Date(parts[0], parts[1] - 1, parts[2]);
+        }
+
+        // Helper to format dates to DD/MM/YYYY
+        function formatDate(date) {
+            if (!date) return "-";
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+
+        // Folio increment helper matching python logic
+        function incrementFolio(folioStr, increment) {
+            const match = folioStr.match(/(\d+)$/);
+            if (match) {
+                const digits = match[1];
+                const prefix = folioStr.slice(0, match.index);
+                const num = parseInt(digits, 10) + increment;
+                const newDigits = String(num).padStart(digits.length, '0');
+                return prefix + newDigits;
+            }
+            return folioStr + "_" + increment;
+        }
+
+        function updatePreview() {
+            const cantidad = parseInt(cantidadInput.value, 10) || 0;
+            const fechaInicial = parseDate(fechaInicialInput.value);
+            const facturasPorDia = parseInt(facturasPorDiaInput.value, 10) || 1;
+            const incrementoFolio = parseInt(incrementoFolioInput.value, 10) || 1;
+            const comportamientoVencimiento = comportamientoVencimientoInput.value;
+
+            // Calculate base date relative difference (plazo)
+            let diffDays = 0;
+            if (baseEmisionStr && baseVencimientoStr) {
+                const bEm = parseDate(baseEmisionStr);
+                const bVe = parseDate(baseVencimientoStr);
+                if (bEm && bVe) {
+                    diffDays = Math.round((bVe - bEm) / (1000 * 60 * 60 * 24));
+                }
+            }
+
+            // Determine starter folio
+            let currentFolioStart = folioInicialInput.value.trim();
+            if (!currentFolioStart) {
+                currentFolioStart = incrementFolio(baseFolio, 1);
+            }
+
+            const tbody = document.querySelector("#preview-table tbody");
+            tbody.innerHTML = "";
+
+            if (cantidad <= 0 || !fechaInicial) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #888;">Introduce valores válidos de cantidad y fecha inicial para previsualizar.</td></tr>`;
+                return;
+            }
+
+            // Limit preview display to 10 rows for UX sanity, but note full count
+            const displayLimit = Math.min(cantidad, 10);
+            
+            for (let i = 0; i < cantidad; i++) {
+                // Calculate emission date
+                const dayOffset = Math.floor(i / facturasPorDia);
+                const currentEmission = new Date(fechaInicial);
+                currentEmission.setDate(fechaInicial.getDate() + dayOffset);
+
+                // Calculate due date
+                let currentVencimiento = null;
+                if (comportamientoVencimiento === "plazo_relativo") {
+                    if (diffDays > 0) {
+                        currentVencimiento = new Date(currentEmission);
+                        currentVencimiento.setDate(currentEmission.getDate() + diffDays);
+                    }
+                } else if (comportamientoVencimiento === "misma_fecha") {
+                    currentVencimiento = currentEmission;
+                }
+
+                // Calculate folio
+                const currentFolio = incrementFolio(currentFolioStart, i * incrementoFolio);
+
+                if (i < displayLimit) {
+                    const row = document.createElement("tr");
+                    row.innerHTML = `
+                        <td><strong>${i + 1}</strong></td>
+                        <td>${baseSerie}</td>
+                        <td><span style="font-family: monospace; font-weight: 600; color: #1e3a47;">${currentFolio}</span></td>
+                        <td>${formatDate(currentEmission)}</td>
+                        <td>${formatDate(currentVencimiento)}</td>
+                    `;
+                    tbody.appendChild(row);
+                }
+            }
+
+            if (cantidad > displayLimit) {
+                const footerRow = document.createElement("tr");
+                footerRow.innerHTML = `
+                    <td colspan="5" style="text-align: center; font-style: italic; background-color: rgba(0,0,0,0.02); color: var(--body-quiet-color, #666);">
+                        ... y ${cantidad - displayLimit} facturas más en la secuencia consecutiva ...
+                    </td>
+                `;
+                tbody.appendChild(footerRow);
+            }
+        }
+
+        // Attach listeners for interactive updates
+        [cantidadInput, fechaInicialInput, facturasPorDiaInput, folioInicialInput, incrementoFolioInput, comportamientoVencimientoInput].forEach(el => {
+            if (el) {
+                el.addEventListener("input", updatePreview);
+                el.addEventListener("change", updatePreview);
+            }
+        });
+
+        // Initialize preview
+        updatePreview();
+    });
+</script>
+{% endblock %}

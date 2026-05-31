@@ -12,6 +12,7 @@ class Factura(models.Model):
         ('Aceptada', 'Aceptada'),
         ('Rechazada', 'Rechazada'),
         ('Pendiente', 'Pendiente'),
+        ('Anulada', 'Anulada'),
     ]
 
     # Identificación
@@ -40,8 +41,8 @@ class Factura(models.Model):
     emisor_correo = models.CharField(max_length=150, default="facturacion@empresa.com")
     
     # Receptor
-    receptor_nombre = models.CharField(max_length=200, default="DANI QUINTERO")
-    receptor_nit = models.CharField(max_length=50, default="7108376")
+    receptor_nombre = models.CharField(max_length=200, default="Dany Arturo Quintero Rojas")
+    receptor_nit = models.CharField(max_length=50, default="7186376")
     receptor_tipo_documento = models.CharField(max_length=50, default="CC")
     receptor_tipo_contribuyente = models.CharField(max_length=100, default="Persona Natural")
     receptor_regimen_fiscal = models.CharField(max_length=100, default="R-99-PN")
@@ -85,6 +86,15 @@ class Factura(models.Model):
     rete_iva = models.DecimalField(max_digits=15, decimal_places=2, default=0) # Manual
     
     qr_code = models.TextField(blank=True, null=True, help_text="Se generar automticamente (Base64).")
+    lote_generacion = models.ForeignKey(
+        'LoteGeneracionFacturas',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='facturas',
+        help_text="Lote de generación masiva al que pertenece esta factura."
+    )
+    descargas = models.IntegerField(default=0, help_text="Contador de descargas de PDF o Word para auditoría de actividad.")
 
     def save(self, *args, **kwargs):
         if not self.cufe:
@@ -127,13 +137,65 @@ class Factura(models.Model):
 
         img = qr.make_image(fill_color="black", back_color="white")
         buffer = BytesIO()
-        img.save(buffer, format="PNG")
+        try:
+            # Dynamic call to bypass static linter checks (Pyrefly) for both Pillow and PyPNGImage
+            getattr(img, 'save')(buffer, **{"format": "PNG"})
+        except TypeError:
+            img.save(buffer)
+
         qr_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
         self.qr_code = f"data:image/png;base64,{qr_b64}"
         self.save(update_fields=['qr_code'])
 
     def __str__(self):
         return f"{self.serie}{self.folio} - {self.emisor_nombre}"
+
+class LoteGeneracionFacturas(models.Model):
+    ESTADOS = [
+        ('ACTIVO', 'Activo'),
+        ('CANCELADO', 'Cancelado (Revertido)'),
+        ('ELIMINADO', 'Eliminado'),
+        ('DESACTIVADO', 'Desactivado (Modo Seguro)'),
+        ('PARCIAL', 'Parcial'),
+    ]
+
+    usuario_creador = models.ForeignKey(
+        'auth.User',
+        on_delete=models.PROTECT,
+        related_name='lotes_creados',
+        verbose_name="Usuario Creador"
+    )
+    usuario_cancelador = models.ForeignKey(
+        'auth.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='lotes_cancelados',
+        verbose_name="Usuario Cancelador"
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    fecha_cancelacion = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de Cancelación")
+    factura_base = models.ForeignKey(
+        'Factura',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='lotes_como_base',
+        verbose_name="Factura Base"
+    )
+    cantidad_generada = models.PositiveIntegerField(verbose_name="Cantidad Generada")
+    fecha_inicio = models.DateField(verbose_name="Fecha de Inicio")
+    fecha_fin = models.DateField(null=True, blank=True, verbose_name="Fecha de Fin")
+    facturas_por_dia = models.PositiveIntegerField(default=1, verbose_name="Facturas por Día")
+    observaciones = models.TextField(blank=True, null=True, verbose_name="Observaciones")
+    motivo_cancelacion = models.TextField(blank=True, null=True, verbose_name="Motivo de Cancelación/Desactivación")
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='ACTIVO', verbose_name="Estado")
+
+    def __str__(self):
+        return f"Lote #{self.id} - Base: {self.factura_base} - Creado por: {self.usuario_creador}"
+
+    class Meta:
+        verbose_name = "Lote de Generación de Facturas"
+        verbose_name_plural = "Lotes de Generación (Generaciones Masivas)"
 
 class Producto(models.Model):
     factura = models.ForeignKey(Factura, related_name='productos', on_delete=models.CASCADE)

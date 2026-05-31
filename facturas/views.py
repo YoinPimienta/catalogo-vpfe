@@ -18,7 +18,11 @@ def buscar_factura(request):
         cufe_clean = str(cufe).strip()
         try:
             factura = Factura.objects.get(cufe=cufe_clean)
-            return render(request, 'factura_detalle.html', {'factura': factura})
+            if factura.estado == 'Anulada' or (factura.lote_generacion and factura.lote_generacion.estado == 'DESACTIVADO'):
+                error = "Este documento ha sido anulado o desactivado y no está disponible para búsquedas normales."
+                factura = None
+            else:
+                return render(request, 'factura_detalle.html', {'factura': factura})
         except Factura.DoesNotExist:
             error = "Documento no encontrado. Verifique el código ingresado e intente nuevamente."
         except Exception as e:
@@ -29,6 +33,8 @@ def buscar_factura(request):
 def ver_factura(request, cufe):
     try:
         factura = Factura.objects.get(cufe=cufe)
+        if factura.estado == 'Anulada' or (factura.lote_generacion and factura.lote_generacion.estado == 'DESACTIVADO'):
+            return render(request, 'buscar.html', {'error': "Este documento ha sido anulado o desactivado y no está disponible."})
         return render(request, 'factura_detalle.html', {'factura': factura})
     except Factura.DoesNotExist:
         return render(request, 'buscar.html', {'error': "Documento no encontrado."})
@@ -36,7 +42,12 @@ def ver_factura(request, cufe):
 def descargar_pdf_factura(request, cufe):
     try:
         from weasyprint import HTML
+        from django.db.models import F
         factura = Factura.objects.get(cufe=cufe)
+        
+        # Registrar descarga para auditoría
+        Factura.objects.filter(pk=factura.pk).update(descargas=F('descargas') + 1)
+        
         factura.recalcular_totales()
         html_string = render_to_string('factura_pdf.html', {'factura': factura, 'request': request})
         
@@ -102,7 +113,12 @@ def resolver_plantilla_por_emisor(emisor_nombre, plantillas_dir):
 
 def descargar_word_factura(request, cufe):
     try:
+        from django.db.models import F
         factura = Factura.objects.get(cufe=cufe)
+        
+        # Registrar descarga para auditoría
+        Factura.objects.filter(pk=factura.pk).update(descargas=F('descargas') + 1)
+        
         factura.recalcular_totales()
         
         # 1. Buscar plantilla local física dinámicamente

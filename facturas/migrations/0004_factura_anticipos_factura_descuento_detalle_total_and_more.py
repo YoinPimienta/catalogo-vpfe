@@ -228,7 +228,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='factura',
             name='receptor_nombre',
-            field=models.CharField(default='DANI QUINTERO', max_length=200),
+            field=models.CharField(default='Dany Arturo Quintero Rojas', max_length=200),
         ),
         migrations.AlterField(
             model_name='factura',

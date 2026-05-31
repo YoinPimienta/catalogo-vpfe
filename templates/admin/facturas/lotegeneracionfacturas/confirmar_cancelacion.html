@@ -1,0 +1,249 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    .cancel-container {
+        max-width: 900px;
+        margin: 30px auto;
+        font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
+    }
+    .cancel-header {
+        background: #fee2e2;
+        border: 1px solid #fca5a5;
+        border-radius: 12px;
+        padding: 24px;
+        color: #991b1b;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 10px rgba(153, 27, 27, 0.05);
+    }
+    .cancel-header h2 {
+        margin: 0 0 10px 0;
+        color: #991b1b !important;
+        font-size: 1.6rem;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .invoice-table-wrapper {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+    [data-theme="dark"] .invoice-table-wrapper {
+        background: #1e293b;
+        border-color: #334155;
+    }
+    .invoice-table-wrapper h3 {
+        margin-top: 0;
+        color: var(--body-loud-color, #1e293b);
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 10px;
+        font-size: 1.2rem;
+    }
+    [data-theme="dark"] .invoice-table-wrapper h3 {
+        border-color: #334155;
+    }
+    
+    .risk-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .risk-high {
+        background-color: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fca5a5;
+    }
+    .risk-medium {
+        background-color: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde68a;
+    }
+    .risk-none {
+        background-color: #d1fae5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+    }
+    
+    .form-box {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+    [data-theme="dark"] .form-box {
+        background: #1e293b;
+        border-color: #334155;
+    }
+    .textarea-custom {
+        width: 100%;
+        min-height: 100px;
+        border-radius: 6px;
+        border: 1px solid #cbd5e1;
+        padding: 12px;
+        font-size: 0.95rem;
+        box-sizing: border-box;
+        margin-top: 8px;
+        background: var(--body-bg, #fff);
+        color: var(--body-color, #000);
+    }
+    .textarea-custom:focus {
+        outline: none;
+        border-color: #dc2626;
+        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+    }
+
+    .btn-row {
+        display: flex;
+        justify-content: flex-end;
+        gap: 15px;
+        margin-top: 20px;
+        padding-top: 15px;
+        border-top: 1px solid #e2e8f0;
+    }
+    [data-theme="dark"] .btn-row {
+        border-color: #334155;
+    }
+    .btn {
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-weight: bold;
+        font-size: 0.95rem;
+        cursor: pointer;
+        text-decoration: none;
+    }
+    .btn-secondary {
+        background: #e2e8f0;
+        color: #475569;
+        border: none;
+    }
+    [data-theme="dark"] .btn-secondary {
+        background: #334155;
+        color: #cbd5e1;
+    }
+    .btn-danger {
+        background: #dc2626;
+        color: white;
+        border: none;
+        box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);
+    }
+    .btn-danger:hover {
+        background: #b91c1c;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cancel-container">
+    <!-- Header alert -->
+    <div class="cancel-header">
+        <h2>⚠️ Confirmación Reversión de Lote #{{ lote.id }}</h2>
+        <p style="margin: 0 0 10px 0; font-size: 1rem; line-height: 1.5;">
+            Estás a punto de <strong>revertir y cancelar definitivamente</strong> la generación masiva correspondiente al Lote #{{ lote.id }}.
+        </p>
+        <p style="margin: 0; font-size: 0.9rem; font-weight: bold;">
+            Esta operación eliminará de forma permanente {{ total_facturas }} facturas generadas por este lote, junto con todos sus productos relacionados y registros de códigos QR. Esta acción no se puede deshacer.
+        </p>
+    </div>
+
+    <!-- Invoice and Risk Table -->
+    <div class="invoice-table-wrapper">
+        <h3>🔍 Análisis de Riesgos y Actividad del Lote</h3>
+        <p style="font-size: 0.85rem; color: var(--body-quiet-color, #666); margin: 0 0 15px 0;">
+            El sistema ha analizado cada factura para verificar si presenta modificaciones manuales o si ha sido descargada por algún usuario o cliente.
+        </p>
+        
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 2px solid #cbd5e1; color: var(--body-quiet-color, #555);">
+                    <th style="padding: 10px 5px;">Factura</th>
+                    <th style="padding: 10px 5px;">Descargas</th>
+                    <th style="padding: 10px 5px;">Cambios Manuales</th>
+                    <th style="padding: 10px 5px;">Nivel de Riesgo</th>
+                    <th style="padding: 10px 5px;">Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in analisis_facturas %}
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                    <td style="padding: 10px 5px;"><strong>{{ item.factura.serie }}{{ item.factura.folio }}</strong></td>
+                    <td style="padding: 10px 5px;">{{ item.factura.descargas }}</td>
+                    <td style="padding: 10px 5px;">
+                        {% if item.tiene_cambios %}
+                            <span style="color: #b91c1c; font-weight: 600;">⚠️ Modificada (Total original: ${{ item.base_total|stringformat:".2f" }} vs ${{ item.factura.total|stringformat:".2f" }})</span>
+                        {% else: %}
+                            <span style="color: #059669;">Sin cambios</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 10px 5px;">
+                        {% if item.nivel_riesgo == 'ALTO' %}
+                            <span class="risk-badge risk-high">Alto Riesgo (Descargada)</span>
+                        {% elif item.nivel_riesgo == 'MEDIO' %}
+                            <span class="risk-badge risk-medium">Medio (Modificada)</span>
+                        {% else %}
+                            <span class="risk-badge risk-none">Sin Riesgos</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 10px 5px;">{{ item.factura.estado }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Confirmation Form -->
+    <div class="form-box">
+        <form method="post">
+            {% csrf_token %}
+            
+            {% if total_con_riesgo > 0 %}
+                <div style="background-color: #fffbeb; border: 1px solid #fef3c7; color: #92400e; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9rem;">
+                    <strong>⚠️ ADVERTENCIA:</strong> Hay {{ total_con_riesgo }} factura(s) con nivel de riesgo medio o alto debido a descargas o modificaciones manuales. 
+                    Eliminar estas facturas podría alterar documentos que ya han sido enviados o manipulados por los clientes.
+                    
+                    {% if not es_superuser %}
+                        <p style="margin: 10px 0 0 0; font-weight: bold; color: #b91c1c;">
+                            🛑 No tienes suficientes privilegios para forzar la reversión de un lote con actividad. Contacta a un Superusuario.
+                        </p>
+                    {% else %}
+                        <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="forzar_cancelacion" name="forzar_cancelacion" value="true" required>
+                            <label for="forzar_cancelacion" style="font-weight: bold; color: #b91c1c; cursor: pointer;">
+                                Confirmar de fuerza mayor que entiendo los riesgos y deseo forzar la eliminación completa del lote.
+                            </label>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label for="motivo" style="font-weight: bold; font-size: 0.95rem; color: var(--body-loud-color, #333);">
+                    Motivo de la Cancelación / Reversión <span style="color: #dc2626;">* (Obligatorio)</span>
+                </label>
+                <textarea id="motivo" name="motivo" class="textarea-custom" placeholder="Ingresa de forma detallada el motivo por el cual estás revirtiendo esta generación masiva..." required></textarea>
+                <span style="font-size: 0.75rem; color: #64748b;">Este motivo se almacenará permanentemente en la bitácora de auditoría junto con tu firma de usuario.</span>
+            </div>
+
+            <div class="btn-row">
+                <a href="{% url 'admin:facturas_lotegeneracionfacturas_change' lote.pk %}" class="btn btn-secondary">Regresar</a>
+                {% if total_con_riesgo == 0 or es_superuser %}
+                    <button type="submit" class="btn btn-danger">❌ Confirmar y Revertir Lote</button>
+                {% else %}
+                    <button type="button" class="btn btn-secondary" style="cursor: not-allowed;" disabled>❌ Bloqueado por Seguridad</button>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
