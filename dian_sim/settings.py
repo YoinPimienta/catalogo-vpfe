@@ -135,7 +135,7 @@ SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 
 # Parse CSRF_TRUSTED_ORIGINS from environment
-CSRF_ORIGINS_STR = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost:8000,https://catalogo-vpfe.onrender.com')
+CSRF_ORIGINS_STR = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost:8000,https://catalogo-vpfe.onrender.com,https://catalogo-vpfe1.onrender.com')
 CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in CSRF_ORIGINS_STR.split(',')]
 
 # CSRF configuration

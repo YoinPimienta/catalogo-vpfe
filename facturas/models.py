@@ -125,7 +125,7 @@ class Factura(models.Model):
         self.save(update_fields=['subtotal', 'descuento_detalle_total', 'iva', 'inc_total', 'total_impuesto', 'total_neto', 'total'])
 
     def generar_qr(self):
-        url = f"https://catalogo-vpfe.onrender.com/?cufe={self.cufe}"
+        url = f"https://catalogo-vpfe1.onrender.com/?cufe={self.cufe}"
         qr = qrcode.QRCode(
             version=1,
             error_correction=qrcode.constants.ERROR_CORRECT_L,
