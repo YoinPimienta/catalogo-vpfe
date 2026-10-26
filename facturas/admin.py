@@ -119,6 +119,16 @@ class ProductoInline(admin.TabularInline):
 
 @admin.register(Factura)
 class FacturaAdmin(admin.ModelAdmin):
+    actions = ['actualizar_codigo_qr_action']
+
+    @admin.action(description="🔄 Regenerar códigos QR de seleccionadas")
+    def actualizar_codigo_qr_action(self, request, queryset):
+        count = 0
+        for factura in queryset:
+            factura.generar_qr()
+            count += 1
+        self.message_user(request, f"Se actualizaron exitosamente los códigos QR de {count} factura(s).", level=messages.SUCCESS)
+
     list_display = ('cufe_corto', 'serie', 'folio', 'emisor_nombre', 'receptor_nombre', 'total', 'estado', 'ver_codigo_qr')
     search_fields = ('cufe', 'serie', 'folio', 'emisor_nombre', 'receptor_nombre', 'emisor_nit')
     list_filter = ('estado', 'fecha_emision')
@@ -188,12 +198,25 @@ class FacturaAdmin(admin.ModelAdmin):
         urls = super().get_urls()
         custom_urls = [
             path(
+                'regenerar-todos-los-qr/',
+                self.admin_site.admin_view(self.regenerar_todos_qr_view),
+                name='facturas_factura_regenerar_todos_qr',
+            ),
+            path(
                 '<path:object_id>/generar-masivo/',
                 self.admin_site.admin_view(self.generar_masivo_view),
                 name='facturas_factura_generar_masivo',
             ),
         ]
         return custom_urls + urls
+
+    def regenerar_todos_qr_view(self, request):
+        count = 0
+        for factura in Factura.objects.all():
+            factura.generar_qr()
+            count += 1
+        self.message_user(request, f"¡Éxito! Se regeneraron los códigos QR de todas las {count} facturas con el nuevo dominio.", level=messages.SUCCESS)
+        return redirect('admin:facturas_factura_changelist')
 
     # Vista de generación masiva adaptada para auditar y registrar el lote
     def generar_masivo_view(self, request, object_id):

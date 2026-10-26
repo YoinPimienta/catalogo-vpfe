@@ -49,6 +49,7 @@ def descargar_pdf_factura(request, cufe):
         Factura.objects.filter(pk=factura.pk).update(descargas=F('descargas') + 1)
         
         factura.recalcular_totales()
+        factura.generar_qr()
         html_string = render_to_string('factura_pdf.html', {'factura': factura, 'request': request})
         
         # Generar el PDF
@@ -120,6 +121,7 @@ def descargar_word_factura(request, cufe):
         Factura.objects.filter(pk=factura.pk).update(descargas=F('descargas') + 1)
         
         factura.recalcular_totales()
+        factura.generar_qr()
         
         # 1. Buscar plantilla local física dinámicamente
         plantillas_dir = os.path.join(settings.BASE_DIR, 'plantillas_base')

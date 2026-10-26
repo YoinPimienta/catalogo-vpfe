@@ -1,0 +1,9 @@
+{% extends "admin/change_list.html" %}
+{% block object-tools-items %}
+    {{ block.super }}
+    <li>
+        <a href="{% url 'admin:facturas_factura_regenerar_todos_qr' %}" onclick="return confirm('¿Deseas regenerar los códigos QR de TODAS las facturas de la base de datos con el nuevo dominio?');" style="background-color: #2563eb; color: white; font-weight: bold; border-radius: 4px; padding: 6px 12px; margin-left: 5px;">
+            🔄 Actualizar Todos los QR
+        </a>
+    </li>
+{% endblock %}
