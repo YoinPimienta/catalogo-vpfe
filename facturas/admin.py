@@ -83,11 +83,13 @@ class GenerarFacturasMasivasForm(forms.Form):
         widget=forms.TextInput(attrs={'placeholder': 'Ej: 1001', 'style': 'max-width: 250px;'}),
         help_text="Si se deja vacío, se tomará el de la factura base incrementado en 1."
     )
-    incremento_folio = forms.IntegerField(
-        min_value=1,
-        initial=1,
-        label="Incrementar Folio en",
-        help_text="Valor en el que se incrementará consecutivamente el folio (por defecto 1)."
+    incremento_folio = forms.CharField(
+        max_length=20,
+        initial="1",
+        required=False,
+        label="Salto / Incremento de Folio",
+        widget=forms.TextInput(attrs={'placeholder': 'Ej: 1, 7, 9 o 6-15', 'style': 'max-width: 250px;'}),
+        help_text="Incremento entre cada factura. Ej: 1 (normal), 7 (de 7 en 7), 9 (de 9 en 9), 15 (de 15 en 15), o rango como 6-15."
     )
     comportamiento_vencimiento = forms.ChoiceField(
         choices=[
@@ -101,6 +103,26 @@ class GenerarFacturasMasivasForm(forms.Form):
     )
 
 # Función auxiliar robusta para incrementar folios alfanuméricos manteniendo ceros a la izquierda
+def parse_salto_folio(salto_val):
+    if not salto_val:
+        return 1
+    if isinstance(salto_val, int):
+        return max(1, salto_val)
+    s = str(salto_val).strip()
+    if '-' in s:
+        parts = s.split('-')
+        try:
+            low = int(parts[0].strip())
+            high = int(parts[1].strip())
+            import random
+            return random.randint(min(low, high), max(low, high))
+        except Exception:
+            return 1
+    try:
+        return max(1, int(s))
+    except Exception:
+        return 1
+
 def increment_folio(folio_str, increment=1):
     match = re.search(r'(\d+)$', folio_str)
     if match:
@@ -217,7 +239,8 @@ def ejecutar_generacion_masiva_para_lote(lote, usuario=None, cajero_custom=None,
             current_folio = increment_folio(current_folio, 1)
 
         folio_a_usar = current_folio
-        current_folio = increment_folio(current_folio, incremento_folio_val)
+        salto_step = parse_salto_folio(incremento_folio_val or getattr(lote, 'salto_folio', '1') or '1')
+        current_folio = increment_folio(current_folio, salto_step)
 
         # Cálculo de hora realista y única
         indice_en_dia = i % facturas_por_dia
@@ -660,7 +683,7 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
             return ()
         return (
             'plantilla', 'usuario_creador', 'usuario_cancelador', 'fecha_creacion', 'fecha_cancelacion', 
-            'factura_base', 'serie', 'folio_inicial', 'cantidad_generada', 'fecha_inicio', 'fecha_fin', 
+            'factura_base', 'serie', 'folio_inicial', 'salto_folio', 'cantidad_generada', 'fecha_inicio', 'fecha_fin', 
             'facturas_por_dia', 'hora_inicial', 'hora_final', 'factura_guia', 'observaciones', 'motivo_cancelacion', 'estado', 
             'mostrar_estadisticas', 'listado_facturas'
         )
@@ -673,7 +696,7 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
                     'fields': (
                         'plantilla',
                         'factura_base',
-                        ('serie', 'folio_inicial'),
+                        ('serie', 'folio_inicial', 'salto_folio'),
                         'cantidad_generada',
                         ('fecha_inicio', 'fecha_fin'),
                         'facturas_por_dia',
@@ -688,7 +711,7 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
                 'fields': ('plantilla', 'usuario_creador', 'fecha_creacion', 'factura_base', 'estado')
             }),
             ('Detalle de Generación Masiva', {
-                'fields': (('serie', 'folio_inicial'), 'cantidad_generada', 'fecha_inicio', 'fecha_fin', 'facturas_por_dia', 'hora_inicial', 'hora_final', 'factura_guia', 'observaciones')
+                'fields': (('serie', 'folio_inicial', 'salto_folio'), 'cantidad_generada', 'fecha_inicio', 'fecha_fin', 'facturas_por_dia', 'hora_inicial', 'hora_final', 'factura_guia', 'observaciones')
             }),
             ('Resumen del Lote', {
                 'fields': ('mostrar_estadisticas',)
@@ -750,7 +773,8 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
                         lote=obj, 
                         usuario=request.user,
                         serie_custom=obj.serie,
-                        folio_inicial=obj.folio_inicial
+                        folio_inicial=obj.folio_inicial,
+                        incremento_folio_val=obj.salto_folio
                     )
                     messages.success(
                         request,
