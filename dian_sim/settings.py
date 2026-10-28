@@ -26,7 +26,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-z5*)+kd6h((t=hc(@c)0zig0u5lj1%2$_teu4iqpgzfhdbcyp#')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
+IS_RENDER = 'RENDER' in os.environ or 'RENDER_EXTERNAL_URL' in os.environ
+DEBUG = os.environ.get('DEBUG', 'False' if IS_RENDER else 'True').lower() == 'true'
 
 # Parse ALLOWED_HOSTS from environment, handling spaces properly
 ALLOWED_HOSTS = ['*']
@@ -78,12 +79,21 @@ WSGI_APPLICATION = 'dian_sim.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': dj_database_url.config(
-        default='sqlite:///db.sqlite3',
-        conn_max_age=600
-    )
-}
+db_url = os.environ.get('DATABASE_URL')
+if db_url:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=db_url,
+            conn_max_age=600
+        )
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation

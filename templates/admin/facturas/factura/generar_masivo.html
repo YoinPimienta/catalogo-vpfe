@@ -241,13 +241,13 @@
 <div class="bulk-container">
     {% if error_message %}
         <div class="errornote-custom">
-            ⚠️ {{ error_message }}
+            {{ error_message }}
         </div>
     {% endif %}
 
     <!-- Factura Base Card -->
     <div class="info-card">
-        <h2>📄 Factura Base Seleccionada</h2>
+        <h2>Factura Base Seleccionada</h2>
         <div class="info-grid">
             <div class="info-item">
                 <span class="info-label">Serie y Folio</span>
@@ -270,8 +270,8 @@
 
     <!-- Configuration Form -->
     <div class="form-wrapper">
-        <h3>⚙️ Configuración de Generación Masiva</h3>
-        <form method="post" id="bulk-form" novalidate>
+        <h3>Configuración de Generación Masiva</h3>
+        <form method="post" id="bulk-form" enctype="multipart/form-data" novalidate>
             {% csrf_token %}
             
             <div class="grid-form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
@@ -295,7 +295,7 @@
 
             <!-- Dynamic Interactive Sequence Preview Box -->
             <div class="preview-box">
-                <h4>🔮 Vista Previa de la Secuencia a Generar</h4>
+                <h4>Vista Previa de la Secuencia a Generar</h4>
                 <p style="margin: 0 0 10px 0; font-size: 0.8rem; color: var(--body-quiet-color, #666);">
                     Esta vista previa calcula dinámicamente cómo se distribuirán los folios y las fechas en tiempo real según tu configuración.
                 </p>
@@ -321,7 +321,7 @@
 
             <div class="submit-row-custom">
                 <a href="{% url 'admin:facturas_factura_change' original.pk %}" class="btn btn-secondary">Cancelar</a>
-                <button type="submit" class="btn btn-primary">⚡ Iniciar Generación Masiva</button>
+                <button type="submit" class="btn btn-primary">Iniciar Generación Masiva</button>
             </div>
         </form>
     </div>
@@ -330,6 +330,7 @@
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         const cantidadInput = document.getElementById("id_cantidad");
+        const serieInput = document.getElementById("id_serie");
         const fechaInicialInput = document.getElementById("id_fecha_inicial");
         const facturasPorDiaInput = document.getElementById("id_facturas_por_dia");
         const folioInicialInput = document.getElementById("id_folio_inicial");
@@ -428,7 +429,7 @@
                     const row = document.createElement("tr");
                     row.innerHTML = `
                         <td><strong>${i + 1}</strong></td>
-                        <td>${baseSerie}</td>
+                        <td>${(serieInput && serieInput.value.trim()) ? serieInput.value.trim().toUpperCase() : baseSerie}</td>
                         <td><span style="font-family: monospace; font-weight: 600; color: #1e3a47;">${currentFolio}</span></td>
                         <td>${formatDate(currentEmission)}</td>
                         <td>${formatDate(currentVencimiento)}</td>
@@ -448,8 +449,32 @@
             }
         }
 
+        const fechaFinalInput = document.getElementById("id_fecha_final");
+        const plantillaInput = document.getElementById("id_plantilla");
+
+        function autoCalcCantidad() {
+            if (fechaInicialInput && fechaFinalInput && fechaFinalInput.value && fechaInicialInput.value) {
+                const fIni = parseDate(fechaInicialInput.value);
+                const fFin = parseDate(fechaFinalInput.value);
+                if (fIni && fFin && fFin >= fIni) {
+                    const days = Math.round((fFin - fIni) / (1000 * 60 * 60 * 24)) + 1;
+                    const fpd = parseInt(facturasPorDiaInput.value, 10) || 3;
+                    cantidadInput.value = days * fpd;
+                }
+            }
+        }
+
+        if (fechaFinalInput) {
+            fechaFinalInput.addEventListener("change", () => { autoCalcCantidad(); updatePreview(); });
+            fechaFinalInput.addEventListener("input", () => { autoCalcCantidad(); updatePreview(); });
+        }
+        if (facturasPorDiaInput) {
+            facturasPorDiaInput.addEventListener("change", autoCalcCantidad);
+            facturasPorDiaInput.addEventListener("input", autoCalcCantidad);
+        }
+
         // Attach listeners for interactive updates
-        [cantidadInput, fechaInicialInput, facturasPorDiaInput, folioInicialInput, incrementoFolioInput, comportamientoVencimientoInput].forEach(el => {
+        [cantidadInput, serieInput, fechaInicialInput, facturasPorDiaInput, folioInicialInput, incrementoFolioInput, comportamientoVencimientoInput, plantillaInput].forEach(el => {
             if (el) {
                 el.addEventListener("input", updatePreview);
                 el.addEventListener("change", updatePreview);

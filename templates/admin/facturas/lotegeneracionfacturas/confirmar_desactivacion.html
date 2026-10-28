@@ -4,128 +4,99 @@
 {% block extrastyle %}
 {{ block.super }}
 <style>
-    .deactivate-container {
-        max-width: 700px;
-        margin: 40px auto;
-        font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
-    }
-    .deactivate-header {
-        background: #fef3c7;
-        border: 1px solid #fde68a;
-        border-radius: 12px;
-        padding: 24px;
-        color: #92400e;
-        margin-bottom: 25px;
-        box-shadow: 0 4px 10px rgba(245, 158, 11, 0.05);
-    }
-    .deactivate-header h2 {
-        margin: 0 0 10px 0;
-        color: #b45309 !important;
-        font-size: 1.6rem;
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    
-    .form-box {
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 24px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    }
-    [data-theme="dark"] .form-box {
-        background: #1e293b;
-        border-color: #334155;
-    }
-    .textarea-custom {
-        width: 100%;
-        min-height: 100px;
-        border-radius: 6px;
-        border: 1px solid #cbd5e1;
-        padding: 12px;
-        font-size: 0.95rem;
-        box-sizing: border-box;
-        margin-top: 8px;
-        background: var(--body-bg, #fff);
-        color: var(--body-color, #000);
-    }
-    .textarea-custom:focus {
-        outline: none;
-        border-color: #d97706;
-        box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
-    }
-
-    .btn-row {
-        display: flex;
-        justify-content: flex-end;
-        gap: 15px;
-        margin-top: 20px;
-        padding-top: 15px;
-        border-top: 1px solid #e2e8f0;
-    }
-    [data-theme="dark"] .btn-row {
-        border-color: #334155;
-    }
-    .btn {
-        padding: 10px 20px;
-        border-radius: 6px;
-        font-weight: bold;
-        font-size: 0.95rem;
-        cursor: pointer;
-        text-decoration: none;
-    }
-    .btn-secondary {
-        background: #e2e8f0;
-        color: #475569;
-        border: none;
-    }
-    [data-theme="dark"] .btn-secondary {
-        background: #334155;
-        color: #cbd5e1;
-    }
-    .btn-warning {
-        background: #d97706;
-        color: white;
-        border: none;
-        box-shadow: 0 2px 4px rgba(217, 119, 6, 0.2);
-    }
-    .btn-warning:hover {
-        background: #b45309;
-    }
+.deact-card {
+    max-width: 640px;
+    margin: 40px auto;
+    background: var(--body-bg, #1e293b);
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 24px;
+    color: #e2e8f0;
+}
+.deact-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #f8fafc;
+    margin: 0 0 8px 0;
+}
+.deact-desc {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    line-height: 1.5;
+    margin: 0 0 20px 0;
+}
+.field-label {
+    display: block;
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin-bottom: 6px;
+}
+.text-input {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid #475569;
+    border-radius: 4px;
+    padding: 8px 12px;
+    color: #f8fafc;
+    font-size: 0.9rem;
+    margin-bottom: 20px;
+}
+.text-input:focus {
+    outline: none;
+    border-color: #38bdf8;
+}
+.btn-group {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    align-items: center;
+}
+.btn-clean {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.btn-cancel {
+    background: transparent;
+    color: #94a3b8;
+    border: 1px solid #475569;
+}
+.btn-cancel:hover {
+    color: #f1f5f9;
+    border-color: #cbd5e1;
+}
+.btn-confirm {
+    background: #475569;
+    color: #ffffff;
+    border: 1px solid #475569;
+}
+.btn-confirm:hover {
+    background: #334155;
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="deactivate-container">
-    <div class="deactivate-header">
-        <h2>⚠️ Modo Seguro: Desactivar Lote #{{ lote.id }}</h2>
-        <p style="margin: 0 0 10px 0; font-size: 1rem; line-height: 1.5;">
-            Estás a punto de **desactivar** el Lote #{{ lote.id }}.
-        </p>
-        <p style="margin: 0; font-size: 0.9rem; font-weight: bold;">
-            En esta modalidad, las {{ total_facturas }} facturas generadas NO se eliminarán. Permanecerán almacenadas en la base de datos marcadas como **Anuladas** y quedarán excluidas de las búsquedas normales del sitio web, permaneciendo disponibles únicamente para auditoría interna.
-        </p>
-    </div>
+<div class="deact-card">
+    <h2 class="deact-title">Desactivar Lote #{{ lote.id }}</h2>
+    <p class="deact-desc">
+        El lote cambiará su estado a <strong>Inactivo</strong>. Las facturas asociadas se mantendrán en el sistema con fines de consulta.
+    </p>
 
-    <div class="form-box">
-        <form method="post">
-            {% csrf_token %}
-            
-            <div style="display: flex; flex-direction: column; gap: 5px;">
-                <label for="motivo" style="font-weight: bold; font-size: 0.95rem; color: var(--body-loud-color, #333);">
-                    Motivo de la Desactivación <span style="color: #dc2626;">* (Obligatorio)</span>
-                </label>
-                <textarea id="motivo" name="motivo" class="textarea-custom" placeholder="Especifica el motivo de la desactivación contable / operativa de este lote de facturas..." required></textarea>
-                <span style="font-size: 0.75rem; color: #64748b;">Tu firma de usuario y la fecha se asociarán a este cambio de estado para fines de auditoría.</span>
-            </div>
+    <form method="post">
+        {% csrf_token %}
+        <label class="field-label" for="id_motivo">Motivo (opcional):</label>
+        <input type="text" id="id_motivo" name="motivo" class="text-input" value="Desactivación por usuario" placeholder="Motivo de la desactivación">
 
-            <div class="btn-row">
-                <a href="{% url 'admin:facturas_lotegeneracionfacturas_change' lote.pk %}" class="btn btn-secondary">Regresar</a>
-                <button type="submit" class="btn btn-warning">⚠️ Desactivar Lote en Modo Seguro</button>
-            </div>
-        </form>
-    </div>
+        <div class="btn-group">
+            <a href="{% url 'admin:facturas_lotegeneracionfacturas_change' lote.pk %}" class="btn-clean btn-cancel">Volver</a>
+            <button type="submit" class="btn-clean btn-confirm">Desactivar Lote</button>
+        </div>
+    </form>
 </div>
 {% endblock %}

@@ -1,5 +1,14 @@
 from django.db import models
-from datetime import date
+from django.utils import timezone
+
+def obtener_hora_actual_colombia():
+    return timezone.localtime(timezone.now()).time().replace(microsecond=0)
+
+def obtener_fecha_actual_colombia():
+    return timezone.localdate()
+
+import datetime
+from datetime import date, time
 from decimal import Decimal
 import uuid
 import qrcode
@@ -8,6 +17,18 @@ from django.core.files import File
 import base64
 
 class Factura(models.Model):
+    PLANTILLAS_CHOICES = [
+        ('JUMBO', 'JUMBO (Cencosud Colombia S.A - Tirilla 80mm)'),
+        ('EXITO', 'ÉXITO (Almacenes Éxito S.A - Tirilla 80mm)'),
+        ('OTRA', 'Otra / Personalizada'),
+    ]
+    plantilla = models.CharField(
+        max_length=50, 
+        choices=PLANTILLAS_CHOICES, 
+        default='JUMBO', 
+        verbose_name="Plantilla / Formato de Impresión"
+    )
+
     ESTADOS = [
         ('Aceptada', 'Aceptada'),
         ('Rechazada', 'Rechazada'),
@@ -19,8 +40,14 @@ class Factura(models.Model):
     cufe = models.CharField(max_length=150, unique=True, blank=True, help_text="Se autogenerará si se deja en blanco.")
     serie = models.CharField(max_length=20, default="I041")
     folio = models.CharField(max_length=20, default="15129088")
-    fecha_emision = models.DateField(default=date.today)
-    fecha_vencimiento = models.DateField(null=True, blank=True)
+    fecha_emision = models.DateField(default=obtener_fecha_actual_colombia, verbose_name="Fecha de Emisión")
+    hora_emision = models.TimeField(default=obtener_hora_actual_colombia, null=True, blank=True, verbose_name="Hora de Emisión")
+    fecha_vencimiento = models.DateField(null=True, blank=True, verbose_name="Fecha de Vencimiento")
+    cajero = models.CharField(max_length=100, default="ZAPATA MICHAELL", blank=True, null=True, verbose_name="Cajero / Operador")
+    terminal = models.CharField(max_length=50, default="1034", blank=True, null=True, verbose_name="Caja / Estación ST")
+    registro = models.CharField(max_length=50, default="05", blank=True, null=True, verbose_name="Registro RG")
+    transaccion = models.CharField(max_length=50, default="9981", blank=True, null=True, verbose_name="No. Transacción TR")
+    rem = models.CharField(max_length=50, default="REM09589", blank=True, null=True, verbose_name="Consecutivo REM / Recibo")
     tipo_operacion = models.CharField(max_length=100, default="10 - Estándar")
     forma_pago = models.CharField(max_length=150, default="Efectivo")
     medio_pago = models.CharField(max_length=50, default="Efectivo")
@@ -97,6 +124,10 @@ class Factura(models.Model):
     descargas = models.IntegerField(default=0, help_text="Contador de descargas de PDF o Word para auditoría de actividad.")
 
     def save(self, *args, **kwargs):
+        if not self.hora_emision:
+            self.hora_emision = obtener_hora_actual_colombia()
+        if not self.fecha_emision:
+            self.fecha_emision = obtener_fecha_actual_colombia()
         if not self.cufe:
             self.cufe = str(uuid.uuid4()).replace('-', '') + str(uuid.uuid4()).replace('-', '')
 
@@ -147,10 +178,27 @@ class Factura(models.Model):
         self.qr_code = f"data:image/png;base64,{qr_b64}"
         self.save(update_fields=['qr_code'])
 
+    @property
+    def barcode_image(self):
+        try:
+            from .word_generator import generar_barcode_stream
+            code = self.rem if self.plantilla == 'JUMBO' else f"{self.serie}{self.folio}"
+            stream = generar_barcode_stream(code)
+            b64 = base64.b64encode(stream.getvalue()).decode('utf-8')
+            return f"data:image/png;base64,{b64}"
+        except Exception:
+            return ""
+
     def __str__(self):
         return f"{self.serie}{self.folio} - {self.emisor_nombre}"
 
 class LoteGeneracionFacturas(models.Model):
+    plantilla = models.CharField(
+        max_length=50, 
+        choices=Factura.PLANTILLAS_CHOICES, 
+        default='JUMBO', 
+        verbose_name="Plantilla / Formato a Utilizar"
+    )
     ESTADOS = [
         ('ACTIVO', 'Activo'),
         ('CANCELADO', 'Cancelado (Revertido)'),
@@ -161,7 +209,9 @@ class LoteGeneracionFacturas(models.Model):
 
     usuario_creador = models.ForeignKey(
         'auth.User',
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='lotes_creados',
         verbose_name="Usuario Creador"
     )
@@ -179,13 +229,31 @@ class LoteGeneracionFacturas(models.Model):
         'Factura',
         on_delete=models.SET_NULL,
         null=True,
+        blank=True,
         related_name='lotes_como_base',
         verbose_name="Factura Base"
     )
-    cantidad_generada = models.PositiveIntegerField(verbose_name="Cantidad Generada")
-    fecha_inicio = models.DateField(verbose_name="Fecha de Inicio")
+    serie = models.CharField(
+        max_length=20, 
+        blank=True, 
+        null=True, 
+        verbose_name="Serie / Prefijo", 
+        help_text="Opcional. Prefijo de la factura (ej: AU06, WJ53). Si se deja vacío, toma el de la base."
+    )
+    folio_inicial = models.CharField(
+        max_length=20, 
+        blank=True, 
+        null=True, 
+        verbose_name="Folio Inicial", 
+        help_text="Opcional. Número consecutivo inicial. Si se deja vacío, incrementa automáticamente."
+    )
+    cantidad_generada = models.PositiveIntegerField(default=5, verbose_name="Cantidad Generada")
+    fecha_inicio = models.DateField(default=obtener_fecha_actual_colombia, verbose_name="Fecha de Inicio")
     fecha_fin = models.DateField(null=True, blank=True, verbose_name="Fecha de Fin")
-    facturas_por_dia = models.PositiveIntegerField(default=1, verbose_name="Facturas por Día")
+    facturas_por_dia = models.PositiveIntegerField(default=3, verbose_name="Facturas por Día")
+    hora_inicial = models.TimeField(default=datetime.time(8, 0), null=True, blank=True, verbose_name="Hora Inicial")
+    hora_final = models.TimeField(default=datetime.time(20, 0), null=True, blank=True, verbose_name="Hora Final")
+    factura_guia = models.FileField(upload_to="facturas_guia/", null=True, blank=True, verbose_name="Plantilla Factura Guía (.docx)")
     observaciones = models.TextField(blank=True, null=True, verbose_name="Observaciones")
     motivo_cancelacion = models.TextField(blank=True, null=True, verbose_name="Motivo de Cancelación/Desactivación")
     estado = models.CharField(max_length=20, choices=ESTADOS, default='ACTIVO', verbose_name="Estado")
@@ -306,3 +374,40 @@ class Producto(models.Model):
 
     def __str__(self):
         return self.nombre
+
+
+# Sincronización automática de secuencia de IDs al eliminar
+from django.db.models.signals import pre_delete, post_delete
+from django.dispatch import receiver
+from django.db import connection
+
+def resetear_autoincrement_tabla(tabla_nombre):
+    """
+    Ajusta el autoincremento al MAX(id) actual de la tabla.
+    Garantiza que al eliminar registros, el próximo ID sea consecutivo y ordenado.
+    Funciona tanto en SQLite como en PostgreSQL.
+    """
+    try:
+        with connection.cursor() as cursor:
+            if connection.vendor == 'sqlite':
+                cursor.execute(f"SELECT COALESCE(MAX(id), 0) FROM {tabla_nombre};")
+                max_id = cursor.fetchone()[0]
+                cursor.execute(f"UPDATE sqlite_sequence SET seq = {max_id} WHERE name = '{tabla_nombre}';")
+            elif connection.vendor == 'postgresql':
+                cursor.execute(f"SELECT setval(pg_get_serial_sequence('{tabla_nombre}', 'id'), coalesce(max(id), 1), max(id) IS NOT null) FROM {tabla_nombre};")
+    except Exception:
+        pass
+
+@receiver(pre_delete, sender=LoteGeneracionFacturas)
+def lote_pre_delete_cascade_facturas(sender, instance, **kwargs):
+    # Eliminar en bloque todas las facturas hijas de este lote
+    instance.facturas.all().delete()
+
+@receiver(post_delete, sender=Factura)
+def factura_post_delete_handler(sender, instance, **kwargs):
+    resetear_autoincrement_tabla('facturas_factura')
+
+@receiver(post_delete, sender=LoteGeneracionFacturas)
+def lote_post_delete_handler(sender, instance, **kwargs):
+    resetear_autoincrement_tabla('facturas_lotegeneracionfacturas')
+    resetear_autoincrement_tabla('facturas_factura')

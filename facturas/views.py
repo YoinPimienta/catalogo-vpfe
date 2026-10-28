@@ -115,114 +115,24 @@ def resolver_plantilla_por_emisor(emisor_nombre, plantillas_dir):
 def descargar_word_factura(request, cufe):
     try:
         from django.db.models import F
+        from . import word_generator
         factura = Factura.objects.get(cufe=cufe)
         
         # Registrar descarga para auditoría
         Factura.objects.filter(pk=factura.pk).update(descargas=F('descargas') + 1)
-        
         factura.recalcular_totales()
         factura.generar_qr()
         
-        # 1. Buscar plantilla local física dinámicamente
-        plantillas_dir = os.path.join(settings.BASE_DIR, 'plantillas_base')
-        file_path = resolver_plantilla_por_emisor(factura.emisor_nombre, plantillas_dir)
-
-        # Validación ESTRICTA física
-        if not file_path or not os.path.exists(file_path):
-            error_details = (
-                f"Error Crítico: El archivo físico de la plantilla no existe en el servidor para el emisor '{factura.emisor_nombre}'.\n"
-                f"Directorio de búsqueda: {plantillas_dir}\n"
-                f"Por favor asegúrate de crear la carpeta 'plantillas_base' en la raíz de tu proyecto y colocar allí los "
-                f"archivos .docx con el nombre de la empresa (Ej. 'FRISBY.docx') o uno llamado 'defecto.docx' como respaldo."
-            )
-            print(error_details)
-            return HttpResponse(error_details, status=404, content_type="text/plain")
-            
-        doc = DocxTemplate(file_path)
+        file_stream = word_generator.generar_factura_word_bytes(factura)
         
-        # 2. Manejar QR Base64 a Image
-        qr_image = None
-        if factura.qr_code and factura.qr_code.startswith('data:image/png;base64,'):
-            qr_b64 = factura.qr_code.split(',')[1]
-            qr_bytes = base64.b64decode(qr_b64)
-            img_stream = io.BytesIO(qr_bytes)
-            # 30 mm = 3 cm de ancho para el QR, ideal para 80mm
-            qr_image = InlineImage(doc, img_stream, width=Mm(30))
-        
-        # Función auxiliar para formatear los números (si no tiene decimales lo deja como int, sino como float)
-        def no_zeros(val):
-            if val is None:
-                return 0
-            float_val = float(val)
-            return int(float_val) if float_val.is_integer() else float_val
-
-        # 3. Preparar lista de productos
-        productos = []
-        for p in factura.productos.all():
-            productos.append({
-                'nombre': p.nombre,
-                'cantidad': no_zeros(p.cantidad),
-                'valor_unitario': no_zeros(p.valor_unitario),
-                'precio_unitario_venta': no_zeros(p.precio_unitario_venta),
-                'descuento': no_zeros(p.descuento),
-                'total_linea': no_zeros(p.total_linea)
-            })
-
-        # 4. Contexto de variables (placeholders)
-        context = {
-            'cufe': factura.cufe,
-            'serie': factura.serie,
-            'folio': factura.folio,
-            'fecha_emision': factura.fecha_emision.strftime('%d/%m/%Y') if factura.fecha_emision else '',
-            'fecha_vencimiento': factura.fecha_vencimiento.strftime('%d/%m/%Y') if factura.fecha_vencimiento else '',
-            
-            'forma_pago': factura.forma_pago,
-            'medio_pago': factura.medio_pago,
-            
-            'rango_desde': factura.rango_desde,
-            'rango_hasta': factura.rango_hasta,
-            'numero_autorizacion': factura.numero_autorizacion,
-            'vigencia': factura.vigencia,
-            'xml_generado_por': factura.xml_generado_por,
-
-            'emisor_nombre': factura.emisor_nombre,
-            'emisor_nit': factura.emisor_nit,
-            'emisor_direccion': factura.emisor_direccion,
-            'emisor_telefono': factura.emisor_telefono,
-            'emisor_correo': factura.emisor_correo,
-            
-            'receptor_nombre': factura.receptor_nombre,
-            'receptor_nit': factura.receptor_nit,
-            'receptor_direccion': factura.receptor_direccion,
-            'receptor_telefono': factura.receptor_telefono,
-            'receptor_correo': factura.receptor_correo,
-            
-            'subtotal': no_zeros(factura.subtotal),
-            'descuento_total': no_zeros(factura.descuento_detalle_total),
-            'total_impuesto': no_zeros(factura.total_impuesto),
-            'iva': no_zeros(factura.iva),
-            'inc_total': no_zeros(factura.inc_total),
-            'total': no_zeros(factura.total),
-            
-            'notas_finales': factura.notas_finales,
-            
-            'productos': productos,
-            'qr': qr_image if qr_image else ''
-        }
-
-        # 5. Renderizar y retornar
-        doc.render(context)
-        file_stream = io.BytesIO()
-        doc.save(file_stream)
-        file_stream.seek(0)
-
         response = HttpResponse(
             file_stream.getvalue(),
             content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         )
-        response['Content-Disposition'] = f'attachment; filename="Factura_{factura.serie}_{factura.folio}.docx"'
+        current_serie = factura.serie if factura.serie else "I0"
+        current_folio = factura.folio if factura.folio else "00"
+        response['Content-Disposition'] = f'attachment; filename="Factura_{current_serie}_{current_folio}.docx"'
         return response
-
     except Factura.DoesNotExist:
         return HttpResponse("Factura no encontrada.", status=404)
     except Exception as e:
@@ -231,7 +141,88 @@ def descargar_word_factura(request, cufe):
         print(error_msg)
         return HttpResponse(error_msg, status=500, content_type="text/plain")
 
-from django.contrib.auth.models import User
+def previsualizar_tirilla(request, cufe):
+    from django.shortcuts import get_object_or_404
+    from .word_generator import generar_documento_factura
+    factura = get_object_or_404(Factura, cufe=cufe)
+    if not factura.qr_code:
+        factura.generar_qr()
+
+    doc = generar_documento_factura(factura)
+    plantilla = factura.plantilla or 'JUMBO'
+    qr_rid = 'rId6' if plantilla == 'EXITO' else 'rId8'
+    bc_rid = 'rId7' if plantilla == 'EXITO' else 'rId9'
+
+    lineas_tirilla = []
+    for p in doc.paragraphs:
+        align = 'center' if p.alignment == 1 else ('right' if p.alignment == 2 else 'left')
+        has_qr = any(qr_rid in r._element.xml for r in p.runs)
+        has_bc = any(bc_rid in r._element.xml for r in p.runs)
+
+        runs_data = []
+        for r in p.runs:
+            if not ('graphic' in r._element.xml):
+                sz = None
+                if r.font and r.font.size:
+                    sz = r.font.size.pt
+                runs_data.append({
+                    'text': r.text,
+                    'bold': bool(r.bold),
+                    'size': sz
+                })
+
+        lineas_tirilla.append({
+            'align': align,
+            'has_qr': has_qr,
+            'has_bc': has_bc,
+            'is_empty': not p.text.strip() and not has_qr and not has_bc,
+            'runs': runs_data,
+            'text': p.text
+        })
+
+    return render(request, 'admin/facturas/tirilla_preview.html', {
+        'factura': factura,
+        'lineas_tirilla': lineas_tirilla,
+    })
+def descargar_lote_word_unificado(request, lote_id):
+    try:
+        from .models import LoteGeneracionFacturas
+        from . import word_generator
+        lote = LoteGeneracionFacturas.objects.get(pk=lote_id)
+        
+        stream = word_generator.generar_lote_word_unificado_bytes(lote)
+        serie = lote.factura_base.serie if lote.factura_base else "VPFE"
+        response = HttpResponse(
+            stream.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        response['Content-Disposition'] = f'attachment; filename="Lote_{lote.id}_Facturas_Unificadas_{serie}.docx"'
+        return response
+    except LoteGeneracionFacturas.DoesNotExist:
+        return HttpResponse("Lote no encontrado.", status=404)
+    except Exception as e:
+        import traceback
+        return HttpResponse(f"Error generando Word unificado: {str(e)}\n\n{traceback.format_exc()}", status=500, content_type="text/plain")
+
+def descargar_lote_zip(request, lote_id):
+    try:
+        from .models import LoteGeneracionFacturas
+        from . import word_generator
+        lote = LoteGeneracionFacturas.objects.get(pk=lote_id)
+        
+        zip_stream = word_generator.generar_lote_zip_bytes(lote)
+        serie = lote.factura_base.serie if lote.factura_base else "VPFE"
+        response = HttpResponse(
+            zip_stream.getvalue(),
+            content_type='application/zip'
+        )
+        response['Content-Disposition'] = f'attachment; filename="Lote_{lote.id}_Facturas_{serie}.zip"'
+        return response
+    except LoteGeneracionFacturas.DoesNotExist:
+        return HttpResponse("Lote no encontrado.", status=404)
+    except Exception as e:
+        import traceback
+        return HttpResponse(f"Error generando ZIP: {str(e)}\n\n{traceback.format_exc()}", status=500, content_type="text/plain")
 
 def crear_admin(request):
     try:

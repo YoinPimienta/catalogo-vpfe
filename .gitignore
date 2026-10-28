@@ -32,7 +32,8 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 /media/
-/staticfiles/*`n!/staticfiles/.gitkeep
+/staticfiles/
+!/staticfiles/.gitkeep
 
 # IDE
 .vscode/

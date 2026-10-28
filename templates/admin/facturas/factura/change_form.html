@@ -5,8 +5,18 @@
     {{ block.super }}
     {% if change and original %}
     <li>
-        <a href="{% url 'admin:facturas_factura_generar_masivo' original.pk %}" class="viewsitelink" style="background: #248080 !important; color: white !important; font-weight: bold; border-radius: 4px; padding: 3px 10px; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.15);">
-            ⚡ Generar Facturas Masivas
+        <a href="{% url 'previsualizar_tirilla' original.cufe %}" target="_blank" class="viewsitelink" style="background: #ffffff !important; color: #1e293b !important; font-weight: 500; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 12px; margin-right: 6px; text-decoration: none; font-size: 0.85rem;">
+            Vista Previa
+        </a>
+    </li>
+    <li>
+        <a href="{% url 'descargar_word_factura' original.cufe %}" class="viewsitelink" style="background: #0f172a !important; color: #ffffff !important; font-weight: 500; border-radius: 4px; padding: 4px 12px; margin-right: 6px; text-decoration: none; font-size: 0.85rem;">
+            Descargar Word
+        </a>
+    </li>
+    <li>
+        <a href="{% url 'admin:facturas_factura_generar_masivo' original.pk %}" class="viewsitelink" style="background: #2563eb !important; color: #ffffff !important; font-weight: 500; border-radius: 4px; padding: 4px 12px; text-decoration: none; font-size: 0.85rem;">
+            Generar Facturas Masivas
         </a>
     </li>
     {% endif %}

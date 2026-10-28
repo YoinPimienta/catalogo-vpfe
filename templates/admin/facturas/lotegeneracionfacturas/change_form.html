@@ -3,16 +3,28 @@
 
 {% block object-tools-items %}
     {{ block.super }}
-    {% if change and original and original.estado == 'ACTIVO' %}
+    {% if change and original %}
     <li>
-        <a href="{% url 'admin:facturas_lote_cancelar' original.pk %}" class="viewsitelink" style="background: #991b1b !important; color: white !important; font-weight: bold; border-radius: 4px; padding: 3px 10px; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.15); margin-right: 5px;">
-            ❌ Cancelar Generación (Revertir)
+        <a href="{% url 'descargar_lote_word_unificado' original.pk %}" class="viewsitelink" style="background: #0f172a !important; color: white !important; font-weight: 500; border-radius: 4px; padding: 4px 12px; margin-right: 6px; text-decoration: none; font-size: 0.85rem;">
+            Descargar Word Unificado
         </a>
     </li>
     <li>
-        <a href="{% url 'admin:facturas_lote_desactivar' original.pk %}" class="viewsitelink" style="background: #d97706 !important; color: white !important; font-weight: bold; border-radius: 4px; padding: 3px 10px; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.15);">
-            ⚠️ Desactivar Lote (Modo Seguro)
+        <a href="{% url 'descargar_lote_zip' original.pk %}" class="viewsitelink" style="background: #ffffff !important; color: #1e293b !important; font-weight: 500; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 12px; margin-right: 6px; text-decoration: none; font-size: 0.85rem;">
+            Descargar ZIP
         </a>
     </li>
+    {% if original.estado == 'ACTIVO' %}
+    <li>
+        <a href="{% url 'admin:facturas_lote_cancelar' original.pk %}" class="viewsitelink" style="background: #ffffff !important; color: #b91c1c !important; font-weight: 500; border: 1px solid #fca5a5; border-radius: 4px; padding: 4px 10px; margin-right: 6px; text-decoration: none; font-size: 0.85rem;">
+            Cancelar Lote (Revertir)
+        </a>
+    </li>
+    <li>
+        <a href="{% url 'admin:facturas_lote_desactivar' original.pk %}" class="viewsitelink" style="background: #ffffff !important; color: #b45309 !important; font-weight: 500; border: 1px solid #fcd34d; border-radius: 4px; padding: 4px 10px; text-decoration: none; font-size: 0.85rem;">
+            Desactivar Lote
+        </a>
+    </li>
+    {% endif %}
     {% endif %}
 {% endblock %}

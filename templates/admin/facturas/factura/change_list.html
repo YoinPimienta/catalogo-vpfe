@@ -2,8 +2,8 @@
 {% block object-tools-items %}
     {{ block.super }}
     <li>
-        <a href="{% url 'admin:facturas_factura_regenerar_todos_qr' %}" onclick="return confirm('¿Deseas regenerar los códigos QR de TODAS las facturas de la base de datos con el nuevo dominio?');" style="background-color: #2563eb; color: white; font-weight: bold; border-radius: 4px; padding: 6px 12px; margin-left: 5px;">
-            🔄 Actualizar Todos los QR
+        <a href="{% url 'admin:facturas_factura_regenerar_todos_qr' %}" onclick="return confirm('¿Deseas regenerar los códigos QR de todas las facturas con el nuevo dominio?');" style="background: transparent; color: #94a3b8; border: 1px solid #475569; font-weight: 500; border-radius: 4px; padding: 5px 12px; margin-left: 5px; font-size: 0.8rem; text-decoration: none;">
+            Actualizar Códigos QR
         </a>
     </li>
 {% endblock %}
