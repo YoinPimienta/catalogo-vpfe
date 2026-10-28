@@ -340,7 +340,12 @@ def generar_barcode_stream(code_text):
     return stream
 
 def limpiar_resaltados(doc):
-    """Elimina el fondo amarillo de todos los runs en el documento para impresión profesional."""
+    """Elimina el fondo amarillo de todos los elementos XML (runs, oMath, pPr) para impresión profesional."""
+    try:
+        for elem in doc._element.xpath('.//w:highlight'):
+            elem.getparent().remove(elem)
+    except Exception:
+        pass
     for p in doc.paragraphs:
         for r in p.runs:
             if r.font.highlight_color is not None:
@@ -381,10 +386,8 @@ def rellenar_plantilla_jumbo(doc_path, factura):
     if 'rId8' in doc.part.rels:
         doc.part.rels['rId8'].target_part._blob = qr_bytes
 
-    bc_stream = generar_barcode_stream(rem)
-    bc_bytes = bc_stream.getvalue()
-    if 'rId9' in doc.part.rels:
-        doc.part.rels['rId9'].target_part._blob = bc_bytes
+    # Se preserva exactamente el código de barras original de la plantilla de Jumbo
+    pass
 
     # Reemplazo quirúrgico en párrafos y runs exactos preservando estilos y tipografía
     if len(doc.paragraphs) > 42:

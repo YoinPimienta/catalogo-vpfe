@@ -153,6 +153,16 @@ def previsualizar_tirilla(request, cufe):
     qr_rid = 'rId6' if plantilla == 'EXITO' else 'rId8'
     bc_rid = 'rId7' if plantilla == 'EXITO' else 'rId9'
 
+    barcode_img_src = None
+    if bc_rid in doc.part.rels:
+        import base64
+        try:
+            img_blob = doc.part.rels[bc_rid].target_part.blob
+            b64 = base64.b64encode(img_blob).decode('utf-8')
+            barcode_img_src = f"data:image/png;base64,{b64}"
+        except Exception:
+            barcode_img_src = None
+
     lineas_tirilla = []
     for p in doc.paragraphs:
         align = 'center' if p.alignment == 1 else ('right' if p.alignment == 2 else 'left')
@@ -183,6 +193,7 @@ def previsualizar_tirilla(request, cufe):
     return render(request, 'admin/facturas/tirilla_preview.html', {
         'factura': factura,
         'lineas_tirilla': lineas_tirilla,
+        'barcode_img_src': barcode_img_src or getattr(factura, 'barcode_image', None),
     })
 def descargar_lote_word_unificado(request, lote_id):
     try:

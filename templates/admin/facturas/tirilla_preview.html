@@ -174,7 +174,7 @@
                 </div>
             {% elif linea.has_bc %}
                 <div class="receipt-media">
-                    <img src="{{ factura.barcode_image }}" alt="Código de Barras" class="barcode-img">
+                    <img src="{{ barcode_img_src|default:factura.barcode_image }}" alt="Código de Barras" class="barcode-img">
                 </div>
             {% elif linea.is_empty %}
                 <div class="receipt-line empty-line">&nbsp;</div>
