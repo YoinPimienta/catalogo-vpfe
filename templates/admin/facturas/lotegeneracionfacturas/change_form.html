@@ -36,79 +36,121 @@
         const textarea = document.getElementById("id_productos_texto");
         if (!textarea) return;
 
-        // Estilos para el textarea
-        textarea.style.fontFamily = "monospace";
-        textarea.style.fontSize = "0.85rem";
-        textarea.style.lineHeight = "1.4";
-        textarea.rows = 6;
-        textarea.style.width = "100%";
-        textarea.style.maxWidth = "800px";
+        // Crear wrapper vertical para aislar del flex del admin
+        const wrapper = document.createElement("div");
+        wrapper.className = "productos-editor-wrapper";
+        wrapper.style.display = "flex";
+        wrapper.style.flexDirection = "column";
+        wrapper.style.gap = "8px";
+        wrapper.style.width = "100%";
+        wrapper.style.maxWidth = "880px";
+        wrapper.style.boxSizing = "border-box";
+        wrapper.style.marginTop = "4px";
 
-        // Contenedor del widget
-        const container = document.createElement("div");
-        container.style.maxWidth = "800px";
-        container.style.marginTop = "6px";
-        container.style.marginBottom = "15px";
+        // Reemplazar posición en el DOM
+        textarea.parentNode.insertBefore(wrapper, textarea);
 
-        // Barra de botones rápidos
-        const btnBar = document.createElement("div");
-        btnBar.style.display = "flex";
-        btnBar.style.flexWrap = "wrap";
-        btnBar.style.gap = "8px";
-        btnBar.style.marginBottom = "8px";
+        // Barra de herramientas superior
+        const toolbar = document.createElement("div");
+        toolbar.style.display = "flex";
+        toolbar.style.alignItems = "center";
+        toolbar.style.justifyContent = "space-between";
+        toolbar.style.flexWrap = "wrap";
+        toolbar.style.gap = "8px";
 
-        const exitoSample = "3100827 | Nevera DOOR COOLING LG No Frost 420 Lts | 1 | 3.365.000\\n3110648 | Nevecón SAMSUNG Tipo Europeo 625 Lts | 1 | 5.500.267\\n3536928 | Aire Acondicionado DualInverter LG 9000 Btu | 1 | 1.637.935";
-        const jumboSample = "3669368 | Jugo Hit surtido pg 10 lev.12 200ml c-u | 3 | 14.550";
+        const btnGroup = document.createElement("div");
+        btnGroup.style.display = "flex";
+        btnGroup.style.gap = "8px";
+        btnGroup.style.alignItems = "center";
 
-        function makeBtn(text, bg, fg, clickHandler) {
+        function makeBtn(text, clickHandler) {
             const btn = document.createElement("button");
             btn.type = "button";
             btn.textContent = text;
-            btn.style.background = bg;
-            btn.style.color = fg;
-            btn.style.border = "1px solid #cbd5e1";
+            btn.style.background = "#1e293b";
+            btn.style.color = "#cbd5e1";
+            btn.style.border = "1px solid #334155";
             btn.style.borderRadius = "4px";
-            btn.style.padding = "4px 10px";
-            btn.style.fontSize = "0.8rem";
+            btn.style.padding = "5px 12px";
+            btn.style.fontSize = "0.78rem";
             btn.style.cursor = "pointer";
             btn.style.fontWeight = "500";
+            btn.style.transition = "all 0.15s ease-in-out";
+
+            btn.addEventListener("mouseenter", function() {
+                btn.style.background = "#334155";
+                btn.style.color = "#f8fafc";
+                btn.style.borderColor = "#475569";
+            });
+            btn.addEventListener("mouseleave", function() {
+                btn.style.background = "#1e293b";
+                btn.style.color = "#cbd5e1";
+                btn.style.borderColor = "#334155";
+            });
             btn.addEventListener("click", clickHandler);
             return btn;
         }
 
-        const btnExito = makeBtn("Cargar ejemplo ÉXITO", "#fef9c3", "#854d0e", function() {
-            textarea.value = exitoSample.replace(/\\n/g, "\n");
+        const exitoSample = "3100827 | Nevera DOOR COOLING LG No Frost 420 Lts | 1 | 3.365.000\n3110648 | Nevecón SAMSUNG Tipo Europeo 625 Lts | 1 | 5.500.267\n3536928 | Aire Acondicionado DualInverter LG 9000 Btu | 1 | 1.637.935";
+        const jumboSample = "3669368 | Jugo Hit surtido pg 10 lev.12 200ml c-u | 3 | 14.550";
+
+        const btnExito = makeBtn("Cargar ejemplo ÉXITO", function() {
+            textarea.value = exitoSample;
             actualizarResumen();
         });
 
-        const btnJumbo = makeBtn("Cargar ejemplo JUMBO", "#dcfce7", "#166534", function() {
-            textarea.value = jumboSample.replace(/\\n/g, "\n");
+        const btnJumbo = makeBtn("Cargar ejemplo JUMBO", function() {
+            textarea.value = jumboSample;
             actualizarResumen();
         });
 
-        const btnLimpiar = makeBtn("Limpiar", "#f1f5f9", "#475569", function() {
+        const btnLimpiar = makeBtn("Limpiar", function() {
             textarea.value = "";
             actualizarResumen();
         });
+        btnLimpiar.style.background = "transparent";
+        btnLimpiar.style.color = "#94a3b8";
 
-        btnBar.appendChild(btnExito);
-        btnBar.appendChild(btnJumbo);
-        btnBar.appendChild(btnLimpiar);
+        btnGroup.appendChild(btnExito);
+        btnGroup.appendChild(btnJumbo);
+        btnGroup.appendChild(btnLimpiar);
 
-        // Resumen en vivo
+        const formatHint = document.createElement("span");
+        formatHint.style.fontSize = "0.75rem";
+        formatHint.style.color = "#64748b";
+        formatHint.textContent = "Formatos: Excel, Código | Nombre | Cant | Precio, o Nombre, Cant, Precio";
+
+        toolbar.appendChild(btnGroup);
+        toolbar.appendChild(formatHint);
+
+        // Estilizar textarea
+        textarea.style.width = "100%";
+        textarea.style.boxSizing = "border-box";
+        textarea.style.fontFamily = "'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace";
+        textarea.style.fontSize = "0.85rem";
+        textarea.style.lineHeight = "1.5";
+        textarea.rows = 5;
+        textarea.style.background = "#0f172a";
+        textarea.style.color = "#f1f5f9";
+        textarea.style.border = "1px solid #334155";
+        textarea.style.borderRadius = "6px";
+        textarea.style.padding = "10px 12px";
+
+        // Tarjeta de resumen inferior (estilo financiero oscuro y elegante)
         const summaryCard = document.createElement("div");
-        summaryCard.style.background = "#f8fafc";
-        summaryCard.style.border = "1px solid #e2e8f0";
+        summaryCard.style.background = "#0f172a";
+        summaryCard.style.border = "1px solid #1e293b";
         summaryCard.style.borderRadius = "6px";
-        summaryCard.style.padding = "8px 12px";
-        summaryCard.style.marginTop = "6px";
+        summaryCard.style.padding = "10px 16px";
         summaryCard.style.fontSize = "0.82rem";
-        summaryCard.style.color = "#334155";
+        summaryCard.style.color = "#94a3b8";
+        summaryCard.style.boxSizing = "border-box";
         summaryCard.style.display = "none";
 
-        // Insertar antes y después del textarea
-        textarea.parentNode.insertBefore(btnBar, textarea);
-        textarea.parentNode.appendChild(summaryCard);
+        // Ensamblar todo en el wrapper vertical
+        wrapper.appendChild(toolbar);
+        wrapper.appendChild(textarea);
+        wrapper.appendChild(summaryCard);
 
         function limpiarMonto(s) {
             if (!s) return 0;
@@ -198,11 +240,14 @@
                 const iva = totalCompra - subtotal;
                 summaryCard.style.display = "block";
                 summaryCard.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                        <span><strong>${itemsDetectados}</strong> producto(s) reconocido(s)</span>
-                        <span>Subtotal: <strong>$${fmtMiles(subtotal)}</strong></span>
-                        <span>IVA 19%: <strong>$${fmtMiles(iva)}</strong></span>
-                        <span style="color: #0f766e; font-weight: 700; font-size: 0.95rem;">Total Factura: $${fmtMiles(totalCompra)} COP</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <span style="color: #cbd5e1; font-weight: 500;">
+                            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #38bdf8; margin-right: 6px; vertical-align: middle;"></span>
+                            ${itemsDetectados} producto(s) reconocido(s)
+                        </span>
+                        <span>Subtotal: <strong style="color: #f1f5f9; font-family: monospace;">$${fmtMiles(subtotal)}</strong></span>
+                        <span>IVA 19%: <strong style="color: #f1f5f9; font-family: monospace;">$${fmtMiles(iva)}</strong></span>
+                        <span style="color: #38bdf8; font-weight: 600; font-size: 0.92rem; font-family: monospace;">Total Factura: $${fmtMiles(totalCompra)} COP</span>
                     </div>
                 `;
             } else {

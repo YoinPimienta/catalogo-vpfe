@@ -740,7 +740,7 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
                         'observaciones',
                     )
                 }),
-                ('🛒 Pegar / Editor Rápido de Productos', {
+                ('Pegar / Editor Rápido de Productos', {
                     'description': 'Pega aquí los productos para reproducir en este lote (desde Excel, Word o texto plano). Puedes usar: Código | Nombre | Cantidad | Precio o simplemente Nombre | Cantidad | Precio. Si se deja vacío, tomará los de la plantilla o base.',
                     'fields': ('productos_texto',)
                 }),
@@ -752,7 +752,7 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
             ('Detalle de Generación Masiva', {
                 'fields': (('serie', 'folio_inicial', 'salto_folio'), 'cantidad_generada', 'fecha_inicio', 'fecha_fin', 'facturas_por_dia', 'hora_inicial', 'hora_final', 'factura_guia', 'observaciones')
             }),
-            ('🛒 Productos del Lote', {
+            ('Productos del Lote', {
                 'fields': ('productos_texto',)
             }),
             ('Resumen del Lote', {
