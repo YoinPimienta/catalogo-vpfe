@@ -32,7 +32,7 @@ class GenerarFacturasMasivasForm(forms.Form):
         max_value=500,
         initial=3,
         label="Cantidad Total de Facturas",
-        help_text="Número total de facturas copias a generar (o se calcula automáticamente con la fecha final)."
+        help_text="Número exacto de facturas a generar. El sistema respetará siempre esta cantidad."
     )
     fecha_inicial = forms.DateField(
         initial=datetime.date.today,
@@ -552,9 +552,13 @@ class FacturaAdmin(admin.ModelAdmin):
                         if not folio_inicial:
                             folio_inicial = increment_folio(base_a_usar.folio, 1)
 
-                if fecha_final and fecha_final >= fecha_inicial:
-                    dias = (fecha_final - fecha_inicial).days + 1
-                    cantidad = dias * facturas_por_dia
+                # Respetar siempre la cantidad exacta solicitada por el usuario
+                if not cantidad:
+                    if fecha_final and fecha_final >= fecha_inicial:
+                        dias = (fecha_final - fecha_inicial).days + 1
+                        cantidad = dias * (facturas_por_dia or 1)
+                    else:
+                        cantidad = 3
 
                 try:
                     with transaction.atomic():
@@ -726,12 +730,13 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
             if not obj.facturas_por_dia:
                 obj.facturas_por_dia = 3
 
-            # Si se dio rango fecha_inicio y fecha_fin, auto-calcular cantidad
-            if obj.fecha_inicio and obj.fecha_fin and obj.fecha_fin >= obj.fecha_inicio:
-                dias = (obj.fecha_fin - obj.fecha_inicio).days + 1
-                obj.cantidad_generada = dias * obj.facturas_por_dia
-            elif not obj.cantidad_generada:
-                obj.cantidad_generada = 3
+            # Respetar SIEMPRE la cantidad_generada exacta solicitada por el usuario
+            if not obj.cantidad_generada:
+                if obj.fecha_inicio and obj.fecha_fin and obj.fecha_fin >= obj.fecha_inicio:
+                    dias = (obj.fecha_fin - obj.fecha_inicio).days + 1
+                    obj.cantidad_generada = dias * (obj.facturas_por_dia or 1)
+                else:
+                    obj.cantidad_generada = 3
 
             if not obj.fecha_fin:
                 dias = (obj.cantidad_generada - 1) // max(obj.facturas_por_dia or 1, 1)

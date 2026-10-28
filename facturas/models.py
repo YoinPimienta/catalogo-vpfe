@@ -247,7 +247,7 @@ class LoteGeneracionFacturas(models.Model):
         verbose_name="Folio Inicial", 
         help_text="Opcional. Número consecutivo inicial. Si se deja vacío, incrementa automáticamente."
     )
-    cantidad_generada = models.PositiveIntegerField(default=5, verbose_name="Cantidad Generada")
+    cantidad_generada = models.PositiveIntegerField(default=5, verbose_name="Cantidad Generada", help_text="Cantidad exacta de facturas a generar (el sistema respetará siempre esta cantidad).")
     fecha_inicio = models.DateField(default=obtener_fecha_actual_colombia, verbose_name="Fecha de Inicio")
     fecha_fin = models.DateField(null=True, blank=True, verbose_name="Fecha de Fin")
     facturas_por_dia = models.PositiveIntegerField(default=3, verbose_name="Facturas por Día")
