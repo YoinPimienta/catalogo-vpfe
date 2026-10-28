@@ -1,4 +1,5 @@
 from django.contrib import admin
+from decimal import Decimal
 from .models import Factura, Producto, LoteGeneracionFacturas
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
@@ -91,6 +92,16 @@ class GenerarFacturasMasivasForm(forms.Form):
         widget=forms.TextInput(attrs={'placeholder': 'Ej: 1, 7, 9 o 6-15', 'style': 'max-width: 250px;'}),
         help_text="Incremento entre cada factura. Ej: 1 (normal), 7 (de 7 en 7), 9 (de 9 en 9), 15 (de 15 en 15), o rango como 6-15."
     )
+    productos_texto = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'rows': 4,
+            'placeholder': 'Opcional: Pega productos aquí (uno por línea).\nEjemplos:\n3100827 | Nevera DOOR COOLING LG | 1 | 3365000\n3110648 | Nevecón SAMSUNG | 1 | 5500267\nO copia y pega desde Excel con columnas: Nombre, Cantidad, Precio',
+            'style': 'width: 100%; max-width: 650px; font-family: monospace; font-size: 0.85rem;'
+        }),
+        required=False,
+        label="Pegar / Editor Rápido de Productos",
+        help_text="Pega la lista de productos a incluir en las facturas generadas. Si se deja vacío, tomará los de la base."
+    )
     comportamiento_vencimiento = forms.ChoiceField(
         choices=[
             ('plazo_relativo', 'Mantener plazo relativo (plazo en días de la factura base)'),
@@ -177,7 +188,7 @@ class ProductoInline(admin.TabularInline):
     fields = ('codigo', 'nombre', 'unidad_medida', 'cantidad', 'valor_unitario', 'precio_incluye_impuesto', 'descuento', 'impuesto', 'impuesto_inc', 'total_linea')
     readonly_fields = ('total_linea',)
 
-def ejecutar_generacion_masiva_para_lote(lote, usuario=None, cajero_custom=None, serie_custom=None, folio_inicial=None, incremento_folio_val=1, comportamiento_vencimiento='plazo_relativo'):
+def ejecutar_generacion_masiva_para_lote(lote, usuario=None, cajero_custom=None, serie_custom=None, folio_inicial=None, incremento_folio_val=1, comportamiento_vencimiento='plazo_relativo', productos_texto=None):
     """
     Función centralizada para generar todas las facturas y productos de un lote.
     Garantiza QR dinámico, CUFE único, horas realistas distribuidas y folios consecutivos.
@@ -333,20 +344,40 @@ def ejecutar_generacion_masiva_para_lote(lote, usuario=None, cajero_custom=None,
         )
         copia_factura.save()
 
-        for producto_base in factura_base.productos.all():
-            Producto.objects.create(
-                factura=copia_factura,
-                codigo=producto_base.codigo,
-                nombre=producto_base.nombre,
-                unidad_medida=producto_base.unidad_medida,
-                cantidad=producto_base.cantidad,
-                valor_unitario=producto_base.valor_unitario,
-                precio_incluye_impuesto=producto_base.precio_incluye_impuesto,
-                descuento=producto_base.descuento,
-                impuesto=producto_base.impuesto,
-                impuesto_inc=producto_base.impuesto_inc,
-                total_linea=producto_base.total_linea
-            )
+        from .word_generator import parsear_productos_texto
+        raw_prods = productos_texto or getattr(lote, 'productos_texto', None)
+        prods_parseados = parsear_productos_texto(raw_prods) if raw_prods else []
+
+        if prods_parseados:
+            for p_info in prods_parseados:
+                Producto.objects.create(
+                    factura=copia_factura,
+                    codigo=p_info.get('codigo', ''),
+                    nombre=p_info.get('nombre', ''),
+                    unidad_medida="94",
+                    cantidad=p_info.get('cantidad', 1),
+                    valor_unitario=p_info.get('valor_unitario', Decimal('0')),
+                    precio_incluye_impuesto=True,
+                    descuento=Decimal('0'),
+                    impuesto=Decimal('0'),
+                    impuesto_inc=Decimal('0'),
+                    total_linea=p_info.get('total_linea', Decimal('0'))
+                )
+        else:
+            for producto_base in factura_base.productos.all():
+                Producto.objects.create(
+                    factura=copia_factura,
+                    codigo=producto_base.codigo,
+                    nombre=producto_base.nombre,
+                    unidad_medida=producto_base.unidad_medida,
+                    cantidad=producto_base.cantidad,
+                    valor_unitario=producto_base.valor_unitario,
+                    precio_incluye_impuesto=producto_base.precio_incluye_impuesto,
+                    descuento=producto_base.descuento,
+                    impuesto=producto_base.impuesto,
+                    impuesto_inc=producto_base.impuesto_inc,
+                    total_linea=producto_base.total_linea
+                )
 
         copia_factura.recalcular_totales()
         facturas_creadas.append(copia_factura)
@@ -586,10 +617,13 @@ class FacturaAdmin(admin.ModelAdmin):
                 try:
                     with transaction.atomic():
                         fecha_fin_calculada = fecha_final or (fecha_inicial + datetime.timedelta(days=((cantidad - 1) // max(facturas_por_dia, 1))))
+                        prods_custom = form.cleaned_data.get('productos_texto', '')
                         lote = LoteGeneracionFacturas.objects.create(
                             plantilla=plantilla_sel,
                             usuario_creador=request.user,
                             factura_base=base_a_usar,
+                            salto_folio=incremento_folio_val or '1',
+                            productos_texto=prods_custom,
                             cantidad_generada=cantidad,
                             fecha_inicio=fecha_inicial,
                             fecha_fin=fecha_fin_calculada,
@@ -608,7 +642,8 @@ class FacturaAdmin(admin.ModelAdmin):
                             serie_custom=serie_custom,
                             folio_inicial=folio_inicial,
                             incremento_folio_val=incremento_folio_val,
-                            comportamiento_vencimiento=comportamiento_vencimiento
+                            comportamiento_vencimiento=comportamiento_vencimiento,
+                            productos_texto=prods_custom
                         )
 
                         folios_creados = [f"{f.serie}{f.folio}" for f in facturas_creadas]
@@ -683,7 +718,7 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
             return ()
         return (
             'plantilla', 'usuario_creador', 'usuario_cancelador', 'fecha_creacion', 'fecha_cancelacion', 
-            'factura_base', 'serie', 'folio_inicial', 'salto_folio', 'cantidad_generada', 'fecha_inicio', 'fecha_fin', 
+            'factura_base', 'serie', 'folio_inicial', 'salto_folio', 'productos_texto', 'cantidad_generada', 'fecha_inicio', 'fecha_fin', 
             'facturas_por_dia', 'hora_inicial', 'hora_final', 'factura_guia', 'observaciones', 'motivo_cancelacion', 'estado', 
             'mostrar_estadisticas', 'listado_facturas'
         )
@@ -692,7 +727,7 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
         if obj is None:
             return (
                 ('Configuración de Generación Masiva', {
-                    'description': 'Selecciona la plantilla, fechas y horas. Si dejas la fecha de fin vacía, se generará la cantidad exacta indicada. Puedes cambiar el prefijo (Serie) antes de producir en serie.',
+                    'description': 'Selecciona la plantilla, fechas y horas. Si dejas la fecha de fin vacía, se generará la cantidad exacta indicada. Si no seleccionas Factura Base, el sistema adoptará automáticamente la plantilla seleccionada.',
                     'fields': (
                         'plantilla',
                         'factura_base',
@@ -705,6 +740,10 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
                         'observaciones',
                     )
                 }),
+                ('🛒 Pegar / Editor Rápido de Productos', {
+                    'description': 'Pega aquí los productos para reproducir en este lote (desde Excel, Word o texto plano). Puedes usar: Código | Nombre | Cantidad | Precio o simplemente Nombre | Cantidad | Precio. Si se deja vacío, tomará los de la plantilla o base.',
+                    'fields': ('productos_texto',)
+                }),
             )
         return (
             ('Información de Registro', {
@@ -712,6 +751,9 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
             }),
             ('Detalle de Generación Masiva', {
                 'fields': (('serie', 'folio_inicial', 'salto_folio'), 'cantidad_generada', 'fecha_inicio', 'fecha_fin', 'facturas_por_dia', 'hora_inicial', 'hora_final', 'factura_guia', 'observaciones')
+            }),
+            ('🛒 Productos del Lote', {
+                'fields': ('productos_texto',)
             }),
             ('Resumen del Lote', {
                 'fields': ('mostrar_estadisticas',)
@@ -774,7 +816,8 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
                         usuario=request.user,
                         serie_custom=obj.serie,
                         folio_inicial=obj.folio_inicial,
-                        incremento_folio_val=obj.salto_folio
+                        incremento_folio_val=obj.salto_folio,
+                        productos_texto=obj.productos_texto
                     )
                     messages.success(
                         request,

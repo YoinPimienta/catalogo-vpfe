@@ -70,6 +70,232 @@ def resolver_plantilla_factura(factura):
 
     return None
 
+
+def limpiar_monto_colombiano(val_str):
+    if not val_str:
+        return Decimal('0')
+    s = str(val_str).strip()
+    s = re.sub(r'[\$A-Za-z\s]', '', s)
+    if '.' in s and ',' not in s:
+        partes = s.split('.')
+        if len(partes) > 2 or (len(partes) == 2 and len(partes[1]) == 3):
+            s = s.replace('.', '')
+        elif len(partes) == 2 and len(partes[1]) in [1, 2]:
+            pass
+        else:
+            s = s.replace('.', '')
+    elif ',' in s and '.' in s:
+        if s.rfind(',') > s.rfind('.'):
+            s = s.replace('.', '').replace(',', '.')
+        else:
+            s = s.replace(',', '')
+    elif ',' in s and '.' not in s:
+        partes = s.split(',')
+        if len(partes) == 2 and len(partes[1]) == 3:
+            s = s.replace(',', '')
+        elif len(partes) == 2 and len(partes[1]) in [1, 2]:
+            s = s.replace(',', '.')
+        else:
+            s = s.replace(',', '')
+            
+    match = re.search(r'[\d\.]+', s)
+    if match:
+        try:
+            return Decimal(match.group(0))
+        except Exception:
+            return Decimal('0')
+    return Decimal('0')
+
+def parsear_productos_texto(texto):
+    """
+    Parsea texto plano con productos y devuelve lista de dicts:
+    [{'codigo': str, 'nombre': str, 'cantidad': int, 'valor_unitario': Decimal, 'total_linea': Decimal}, ...]
+    Soporta formato Excel (tabulado), pipes (|), comas, formato natural (1 x 3.365.000 Nombre)
+    y tirillas oficiales copiadas directamente.
+    """
+    if not texto or not texto.strip():
+        return []
+
+    lineas = [l.strip() for l in texto.strip().splitlines() if l.strip()]
+    productos = []
+    
+    i = 0
+    while i < len(lineas):
+        linea = lineas[i]
+        
+        # Ignorar encabezados comunes si vienen en el copiado
+        if any(h in linea.upper() for h in ['PLU', 'DETALLE', 'PRECIO', 'TOTAL ITEM', 'SUBTOTAL', 'VALOR TOTAL', 'FORMA PAGO', 'DISCRIMINACION', 'ITEMS COMPRADOS', 'RESUMEN DE IVA']):
+            i += 1
+            continue
+            
+        m_exito_header = re.match(r'^\d+\s+(\d+)/u\s+[xX]\s*([\$\d\.,]+)', linea)
+        if m_exito_header:
+            cantidad = int(m_exito_header.group(1))
+            precio = limpiar_monto_colombiano(m_exito_header.group(2))
+            desc_lines = []
+            i += 1
+            while i < len(lineas):
+                sig = lineas[i]
+                if re.match(r'^\d+\s+(\d+)/u\s+[xX]', sig) or any(h in sig.upper() for h in ['TOTAL ITEM', 'SUBTOTAL']):
+                    break
+                desc_lines.append(sig)
+                i += 1
+                if any(sig.endswith(suf) for suf in ['A', 'B', 'N']) and any(c.isdigit() for c in sig):
+                    break
+            
+            desc_full = " ".join(desc_lines)
+            m_plu = re.match(r'^(\d{5,8})\s+(.*)$', desc_full)
+            if m_plu:
+                codigo = m_plu.group(1)
+                nombre_raw = m_plu.group(2)
+            else:
+                codigo = f"{random.randint(3100000, 3999999)}"
+                nombre_raw = desc_full
+            nombre = re.sub(r'[\$\d\.,]+[A-Za-z]?\s*$', '', nombre_raw).strip()
+            if not nombre:
+                nombre = nombre_raw.strip()
+            total_linea = precio * cantidad
+            productos.append({
+                'codigo': codigo,
+                'nombre': nombre,
+                'cantidad': cantidad,
+                'valor_unitario': precio,
+                'total_linea': total_linea
+            })
+            continue
+
+        delimitador = None
+        for sep in ['\t', '|', ';']:
+            if sep in linea:
+                delimitador = sep
+                break
+        
+        if delimitador:
+            partes = [p.strip() for p in linea.split(delimitador) if p.strip()]
+            if len(partes) >= 4:
+                codigo = partes[0]
+                nombre = partes[1]
+                try:
+                    cantidad = int(re.sub(r'\D', '', partes[2]) or '1')
+                except Exception:
+                    cantidad = 1
+                precio = limpiar_monto_colombiano(partes[3])
+            elif len(partes) == 3:
+                if re.match(r'^\d+$', partes[1]) and len(partes[1]) <= 4:
+                    codigo = f"{random.randint(3100000, 3999999)}"
+                    nombre = partes[0]
+                    cantidad = int(partes[1])
+                    precio = limpiar_monto_colombiano(partes[2])
+                elif re.match(r'^\d{5,8}$', partes[0]):
+                    codigo = partes[0]
+                    nombre = partes[1]
+                    cantidad = 1
+                    precio = limpiar_monto_colombiano(partes[2])
+                else:
+                    codigo = f"{random.randint(3100000, 3999999)}"
+                    nombre = partes[0]
+                    try:
+                        cantidad = int(re.sub(r'\D', '', partes[1]) or '1')
+                    except Exception:
+                        cantidad = 1
+                    precio = limpiar_monto_colombiano(partes[2])
+            elif len(partes) == 2:
+                codigo = f"{random.randint(3100000, 3999999)}"
+                nombre = partes[0]
+                cantidad = 1
+                precio = limpiar_monto_colombiano(partes[1])
+            else:
+                i += 1
+                continue
+        else:
+            m_nat = re.match(r'^(\d+)\s*[xX]\s*([\$\d\.,]+)\s+(.+)$', linea)
+            if m_nat:
+                cantidad = int(m_nat.group(1))
+                precio = limpiar_monto_colombiano(m_nat.group(2))
+                nombre = m_nat.group(3).strip()
+                codigo = f"{random.randint(3100000, 3999999)}"
+            else:
+                m_coma = [p.strip() for p in linea.split(',') if p.strip()]
+                if len(m_coma) >= 3:
+                    codigo = f"{random.randint(3100000, 3999999)}"
+                    nombre = m_coma[0]
+                    try:
+                        cantidad = int(re.sub(r'\D', '', m_coma[1]) or '1')
+                    except Exception:
+                        cantidad = 1
+                    precio = limpiar_monto_colombiano(m_coma[2])
+                elif len(m_coma) == 2:
+                    codigo = f"{random.randint(3100000, 3999999)}"
+                    nombre = m_coma[0]
+                    cantidad = 1
+                    precio = limpiar_monto_colombiano(m_coma[1])
+                else:
+                    m_fin = re.search(r'^(.*?)\s+([\$\d\.,]{3,})$', linea)
+                    if m_fin:
+                        codigo = f"{random.randint(3100000, 3999999)}"
+                        nombre = m_fin.group(1).strip()
+                        cantidad = 1
+                        precio = limpiar_monto_colombiano(m_fin.group(2))
+                    else:
+                        i += 1
+                        continue
+
+        if nombre:
+            if cantidad <= 0:
+                cantidad = 1
+            total_linea = precio * cantidad
+            productos.append({
+                'codigo': str(codigo).strip(),
+                'nombre': str(nombre).strip(),
+                'cantidad': cantidad,
+                'valor_unitario': precio,
+                'total_linea': total_linea
+            })
+        i += 1
+
+    return productos
+
+def formatear_lineas_producto_exito(idx, codigo, nombre, cantidad, valor_unitario, total_linea):
+    lineas = []
+    p_unit_str = fmt_pesos(valor_unitario, separador_miles=".")
+    lineas.append(f"{idx} {cantidad}/u x {p_unit_str} V.Ahorro 0")
+    
+    precio_str = f"{fmt_pesos(total_linea, separador_miles='.')}A"
+    texto_completo = f"{codigo} {nombre}".strip()
+    palabras = texto_completo.split()
+    
+    lineas_desc = []
+    linea_actual = ""
+    max_ancho = 28
+    
+    for p in palabras:
+        if not linea_actual:
+            linea_actual = p
+        elif len(linea_actual) + 1 + len(p) <= max_ancho:
+            linea_actual += " " + p
+        else:
+            lineas_desc.append(linea_actual)
+            linea_actual = p
+    if linea_actual:
+        lineas_desc.append(linea_actual)
+        
+    if not lineas_desc:
+        lineas_desc = [texto_completo]
+        
+    ancho_total = 40
+    ultima = lineas_desc[-1]
+    
+    if len(ultima) + 1 + len(precio_str) > ancho_total:
+        lineas.extend(lineas_desc)
+        espacios = ancho_total - len(precio_str)
+        lineas.append(" " * max(espacios, 1) + precio_str)
+    else:
+        espacios = ancho_total - len(ultima) - len(precio_str)
+        lineas_desc[-1] = ultima + (" " * max(espacios, 1)) + precio_str
+        lineas.extend(lineas_desc)
+        
+    return lineas
+
 def fmt_pesos(val, separador_miles="."):
     if val is None:
         return "0"
@@ -216,22 +442,55 @@ def rellenar_plantilla_jumbo(doc_path, factura):
         else:
             p64.text = f"                {rem}"
 
-    # Si se editaron productos en la factura base, actualizamos totales
-    productos = factura.productos.all()
-    if productos.exists() and (factura.total != Decimal('43650.00') or productos.count() > 1):
+    # Inyección dinámica de productos en plantilla JUMBO
+    productos = factura.productos.all().order_by('id')
+    if productos.exists():
+        idx_inicio = None
+        idx_fin = None
+        for p_idx, p in enumerate(doc.paragraphs):
+            if '=================================================' in p.text and idx_inicio is None:
+                idx_inicio = p_idx
+            elif '--------------------------------------------------------------------------------' in p.text and idx_inicio is not None and p_idx > idx_inicio:
+                idx_fin = p_idx
+                break
+
+        if idx_inicio is not None and idx_fin is not None:
+            target_p = doc.paragraphs[idx_fin]
+            parrafos_a_borrar = [doc.paragraphs[k] for k in range(idx_inicio + 1, idx_fin)]
+            for p in parrafos_a_borrar:
+                p._p.getparent().remove(p._p)
+
+            for prod in productos:
+                p_unit_str = fmt_pesos(prod.valor_unitario)
+                p_tot_str = fmt_pesos(prod.total_linea)
+                cod = prod.codigo or "3669368"
+                l1 = f"{prod.cantidad}  X {p_unit_str}"
+                l2 = f"{cod} {prod.nombre[:45]}      ${p_tot_str}"
+                new_p1 = target_p.insert_paragraph_before(l1)
+                new_p1.style = doc.styles['Normal']
+                new_p2 = target_p.insert_paragraph_before(l2)
+                new_p2.style = doc.styles['Normal']
+            new_p_space = target_p.insert_paragraph_before("      ")
+            new_p_space.style = doc.styles['Normal']
+
         total_fmt = fmt_pesos(factura.total)
         subtotal_fmt = fmt_pesos(factura.subtotal or factura.total)
         iva_fmt = fmt_pesos(factura.iva)
         cambio_fmt = fmt_pesos(Decimal('50000.00') - factura.total) if factura.total < Decimal('50000.00') else '0'
 
-        if len(doc.paragraphs) > 18:
-            doc.paragraphs[18].text = f"                   SUBTOTAL/TOTAL                                  {total_fmt}"
-        if len(doc.paragraphs) > 21:
-            doc.paragraphs[21].text = f"CAMBIO                                                                                 {cambio_fmt}"
-        if len(doc.paragraphs) > 26:
-            doc.paragraphs[26].text = f"N=19%                                  {subtotal_fmt}                       {iva_fmt}"
-        if len(doc.paragraphs) > 29:
-            doc.paragraphs[29].text = f" TOTAL                              {total_fmt}                           {iva_fmt}"
+        for p in doc.paragraphs:
+            if 'ITEMS   COMPRADOS' in p.text:
+                p.text = f"            ITEMS   COMPRADOS  : {productos.count()}"
+            elif 'SUBTOTAL/TOTAL' in p.text:
+                p.text = f"                   SUBTOTAL/TOTAL                                  {total_fmt}"
+            elif p.text.startswith('EFECTIVO'):
+                p.text = f"EFECTIVO                                                                             {total_fmt}"
+            elif p.text.startswith('CAMBIO'):
+                p.text = f"CAMBIO                                                                                 {cambio_fmt}"
+            elif p.text.startswith('N=19%'):
+                p.text = f"N=19%                                  {subtotal_fmt}                       {iva_fmt}"
+            elif p.text.startswith(' TOTAL'):
+                p.text = f" TOTAL                              {total_fmt}                           {iva_fmt}"
 
     limpiar_resaltados(doc)
     return doc
@@ -312,9 +571,40 @@ def rellenar_plantilla_exito(doc_path, factura):
         elif p_text.startswith('NUTRX:'):
             p.text = f"NUTRX:{fecha_compact}05800008{tr_formatted}"
 
-    # Si se editaron productos en la factura base, actualizamos totales
-    productos = factura.productos.all()
-    if productos.exists() and (factura.total != Decimal('10503202.00') or productos.count() != 3):
+    # Inyección dinámica de productos en plantilla ÉXITO
+    productos = factura.productos.all().order_by('id')
+    if productos.exists():
+        idx_plu = None
+        idx_total_item = None
+        for p_idx, p in enumerate(doc.paragraphs):
+            if 'PLU' in p.text and 'DETALLE' in p.text:
+                idx_plu = p_idx
+            elif 'Total Item' in p.text:
+                idx_total_item = p_idx
+                break
+
+        if idx_plu is not None and idx_total_item is not None:
+            target_p = doc.paragraphs[idx_total_item]
+            parrafos_a_borrar = [doc.paragraphs[k] for k in range(idx_plu + 1, idx_total_item)]
+            for p in parrafos_a_borrar:
+                p._p.getparent().remove(p._p)
+
+            for idx, prod in enumerate(productos, 1):
+                cod = prod.codigo or f"{random.randint(3100000, 3999999)}"
+                lineas_prod = formatear_lineas_producto_exito(
+                    idx=idx,
+                    codigo=cod,
+                    nombre=prod.nombre,
+                    cantidad=prod.cantidad,
+                    valor_unitario=prod.valor_unitario,
+                    total_linea=prod.total_linea
+                )
+                for l in lineas_prod:
+                    new_p = target_p.insert_paragraph_before(l)
+                    new_p.style = doc.styles['Normal']
+
+            target_p.text = f"Total Item : {productos.count()}"
+
         total_fmt = fmt_pesos(factura.total, separador_miles=".")
         subtotal_fmt = fmt_pesos(factura.subtotal or factura.total, separador_miles=".")
         iva_fmt = fmt_pesos(factura.iva, separador_miles=".")

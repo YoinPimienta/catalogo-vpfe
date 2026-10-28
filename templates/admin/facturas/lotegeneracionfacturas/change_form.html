@@ -28,3 +28,191 @@
     {% endif %}
     {% endif %}
 {% endblock %}
+
+{% block admin_change_form_document_ready %}
+    {{ block.super }}
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const textarea = document.getElementById("id_productos_texto");
+        if (!textarea) return;
+
+        // Estilos para el textarea
+        textarea.style.fontFamily = "monospace";
+        textarea.style.fontSize = "0.85rem";
+        textarea.style.lineHeight = "1.4";
+        textarea.rows = 6;
+        textarea.style.width = "100%";
+        textarea.style.maxWidth = "800px";
+
+        // Contenedor del widget
+        const container = document.createElement("div");
+        container.style.maxWidth = "800px";
+        container.style.marginTop = "6px";
+        container.style.marginBottom = "15px";
+
+        // Barra de botones rápidos
+        const btnBar = document.createElement("div");
+        btnBar.style.display = "flex";
+        btnBar.style.flexWrap = "wrap";
+        btnBar.style.gap = "8px";
+        btnBar.style.marginBottom = "8px";
+
+        const exitoSample = "3100827 | Nevera DOOR COOLING LG No Frost 420 Lts | 1 | 3.365.000\\n3110648 | Nevecón SAMSUNG Tipo Europeo 625 Lts | 1 | 5.500.267\\n3536928 | Aire Acondicionado DualInverter LG 9000 Btu | 1 | 1.637.935";
+        const jumboSample = "3669368 | Jugo Hit surtido pg 10 lev.12 200ml c-u | 3 | 14.550";
+
+        function makeBtn(text, bg, fg, clickHandler) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.textContent = text;
+            btn.style.background = bg;
+            btn.style.color = fg;
+            btn.style.border = "1px solid #cbd5e1";
+            btn.style.borderRadius = "4px";
+            btn.style.padding = "4px 10px";
+            btn.style.fontSize = "0.8rem";
+            btn.style.cursor = "pointer";
+            btn.style.fontWeight = "500";
+            btn.addEventListener("click", clickHandler);
+            return btn;
+        }
+
+        const btnExito = makeBtn("Cargar ejemplo ÉXITO", "#fef9c3", "#854d0e", function() {
+            textarea.value = exitoSample.replace(/\\n/g, "\n");
+            actualizarResumen();
+        });
+
+        const btnJumbo = makeBtn("Cargar ejemplo JUMBO", "#dcfce7", "#166534", function() {
+            textarea.value = jumboSample.replace(/\\n/g, "\n");
+            actualizarResumen();
+        });
+
+        const btnLimpiar = makeBtn("Limpiar", "#f1f5f9", "#475569", function() {
+            textarea.value = "";
+            actualizarResumen();
+        });
+
+        btnBar.appendChild(btnExito);
+        btnBar.appendChild(btnJumbo);
+        btnBar.appendChild(btnLimpiar);
+
+        // Resumen en vivo
+        const summaryCard = document.createElement("div");
+        summaryCard.style.background = "#f8fafc";
+        summaryCard.style.border = "1px solid #e2e8f0";
+        summaryCard.style.borderRadius = "6px";
+        summaryCard.style.padding = "8px 12px";
+        summaryCard.style.marginTop = "6px";
+        summaryCard.style.fontSize = "0.82rem";
+        summaryCard.style.color = "#334155";
+        summaryCard.style.display = "none";
+
+        // Insertar antes y después del textarea
+        textarea.parentNode.insertBefore(btnBar, textarea);
+        textarea.parentNode.appendChild(summaryCard);
+
+        function limpiarMonto(s) {
+            if (!s) return 0;
+            s = s.replace(/[\$A-Za-z\s]/g, "");
+            if (s.indexOf(".") !== -1 && s.indexOf(",") === -1) {
+                const partes = s.split(".");
+                if (partes.length > 2 || (partes.length === 2 && partes[1].length === 3)) {
+                    s = s.replace(/\./g, "");
+                }
+            } else if (s.indexOf(",") !== -1 && s.indexOf(".") !== -1) {
+                if (s.lastIndexOf(",") > s.lastIndexOf(".")) {
+                    s = s.replace(/\./g, "").replace(",", ".");
+                } else {
+                    s = s.replace(/,/g, "");
+                }
+            } else if (s.indexOf(",") !== -1 && s.indexOf(".") === -1) {
+                const partes = s.split(",");
+                if (partes.length === 2 && partes[1].length === 3) {
+                    s = s.replace(/,/g, "");
+                } else {
+                    s = s.replace(/,/g, ".");
+                }
+            }
+            const match = s.match(/[\d\.]+/);
+            return match ? parseFloat(match[0]) : 0;
+        }
+
+        function fmtMiles(n) {
+            return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        }
+
+        function actualizarResumen() {
+            const lines = textarea.value.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+            if (lines.length === 0) {
+                summaryCard.style.display = "none";
+                return;
+            }
+
+            let totalCompra = 0;
+            let itemsDetectados = 0;
+
+            lines.forEach(line => {
+                let delim = null;
+                if (line.includes("\t")) delim = "\t";
+                else if (line.includes("|")) delim = "|";
+                else if (line.includes(";")) delim = ";";
+
+                let precio = 0;
+                let cant = 1;
+
+                if (delim) {
+                    const partes = line.split(delim).map(p => p.trim()).filter(p => p.length > 0);
+                    if (partes.length >= 4) {
+                        cant = parseInt(partes[2].replace(/\D/g, "") || "1", 10) || 1;
+                        precio = limpiarMonto(partes[3]);
+                    } else if (partes.length === 3) {
+                        if (/^\d+$/.test(partes[1]) && partes[1].length <= 4) {
+                            cant = parseInt(partes[1], 10) || 1;
+                            precio = limpiarMonto(partes[2]);
+                        } else {
+                            precio = limpiarMonto(partes[2]);
+                        }
+                    } else if (partes.length === 2) {
+                        precio = limpiarMonto(partes[1]);
+                    }
+                } else {
+                    const mNat = line.match(/^(\d+)\s*[xX]\s*([\$\d\.,]+)/);
+                    if (mNat) {
+                        cant = parseInt(mNat[1], 10) || 1;
+                        precio = limpiarMonto(mNat[2]);
+                    } else {
+                        const mFin = line.match(/[\$\d\.,]{3,}$/);
+                        if (mFin) {
+                            precio = limpiarMonto(mFin[0]);
+                        }
+                    }
+                }
+
+                if (precio > 0) {
+                    itemsDetectados++;
+                    totalCompra += (precio * cant);
+                }
+            });
+
+            if (itemsDetectados > 0) {
+                const subtotal = totalCompra / 1.19;
+                const iva = totalCompra - subtotal;
+                summaryCard.style.display = "block";
+                summaryCard.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <span><strong>${itemsDetectados}</strong> producto(s) reconocido(s)</span>
+                        <span>Subtotal: <strong>$${fmtMiles(subtotal)}</strong></span>
+                        <span>IVA 19%: <strong>$${fmtMiles(iva)}</strong></span>
+                        <span style="color: #0f766e; font-weight: 700; font-size: 0.95rem;">Total Factura: $${fmtMiles(totalCompra)} COP</span>
+                    </div>
+                `;
+            } else {
+                summaryCard.style.display = "none";
+            }
+        }
+
+        textarea.addEventListener("input", actualizarResumen);
+        textarea.addEventListener("change", actualizarResumen);
+        actualizarResumen();
+    });
+    </script>
+{% endblock %}

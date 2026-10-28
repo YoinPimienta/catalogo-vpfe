@@ -138,21 +138,39 @@ class Factura(models.Model):
 
     def recalcular_totales(self):
         productos = self.productos.all()
-        subtotal = sum((p.base_linea for p in productos), Decimal('0'))
-        descuento_detalle = sum((p.descuento for p in productos), Decimal('0'))
-        iva = sum((p.monto_iva for p in productos), Decimal('0'))
-        inc = sum((p.monto_inc for p in productos), Decimal('0'))
-        
-        self.subtotal = subtotal
-        self.descuento_detalle_total = descuento_detalle
-        self.iva = iva
-        self.inc_total = inc
-        self.total_impuesto = iva + inc + getattr(self, 'otros_impuestos', Decimal('0'))
-        
-        self.total_neto = self.subtotal - self.descuento_detalle_total + self.total_impuesto
-        rec = getattr(self, 'recargo_global', Decimal('0'))
-        des = getattr(self, 'descuento_global', Decimal('0'))
-        self.total = self.total_neto - des + rec
+        if not productos.exists():
+            return
+        if all(p.precio_incluye_impuesto for p in productos):
+            total_lineas = sum((p.total_linea for p in productos), Decimal('0'))
+            descuento_detalle = sum((p.descuento for p in productos), Decimal('0'))
+            rec = getattr(self, 'recargo_global', Decimal('0')) or Decimal('0')
+            des = getattr(self, 'descuento_global', Decimal('0')) or Decimal('0')
+            total = total_lineas - des + rec
+            subtotal = (total / Decimal('1.19')).quantize(Decimal('0.01'))
+            iva = total - subtotal
+            self.subtotal = subtotal
+            self.descuento_detalle_total = descuento_detalle
+            self.iva = iva
+            self.inc_total = Decimal('0')
+            self.total_impuesto = iva
+            self.total_neto = total
+            self.total = total
+        else:
+            subtotal = sum((p.base_linea for p in productos), Decimal('0'))
+            descuento_detalle = sum((p.descuento for p in productos), Decimal('0'))
+            iva = sum((p.monto_iva for p in productos), Decimal('0'))
+            inc = sum((p.monto_inc for p in productos), Decimal('0'))
+            
+            self.subtotal = subtotal
+            self.descuento_detalle_total = descuento_detalle
+            self.iva = iva
+            self.inc_total = inc
+            self.total_impuesto = iva + inc + getattr(self, 'otros_impuestos', Decimal('0'))
+            
+            self.total_neto = self.subtotal - self.descuento_detalle_total + self.total_impuesto
+            rec = getattr(self, 'recargo_global', Decimal('0')) or Decimal('0')
+            des = getattr(self, 'descuento_global', Decimal('0')) or Decimal('0')
+            self.total = self.total_neto - des + rec
         self.save(update_fields=['subtotal', 'descuento_detalle_total', 'iva', 'inc_total', 'total_impuesto', 'total_neto', 'total'])
 
     def generar_qr(self):
@@ -252,6 +270,12 @@ class LoteGeneracionFacturas(models.Model):
         default="1",
         verbose_name="Salto / Incremento de Folio",
         help_text="Incremento entre cada factura. Ej: 1 (consecutivo 1 en 1), 7 (de 7 en 7), 9 (de 9 en 9), 15 (de 15 en 15), o un rango aleatorio como 6-15."
+    )
+    productos_texto = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Pegar / Editor Rápido de Productos",
+        help_text="Pega aquí la lista de productos para este lote (desde Excel o texto). Formatos: Código | Nombre | Cantidad | Precio, o Nombre | Cantidad | Precio. Si se deja vacío, tomará los productos de la plantilla seleccionada o de la factura base."
     )
     cantidad_generada = models.PositiveIntegerField(default=5, verbose_name="Cantidad Generada", help_text="Cantidad exacta de facturas a generar (el sistema respetará siempre esta cantidad).")
     fecha_inicio = models.DateField(default=obtener_fecha_actual_colombia, verbose_name="Fecha de Inicio")

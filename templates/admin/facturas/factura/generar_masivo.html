@@ -481,6 +481,53 @@
             }
         });
 
+        // Quick Product Editor Helper
+        const prodTextarea = document.getElementById("id_productos_texto");
+        if (prodTextarea) {
+            prodTextarea.style.fontFamily = "monospace";
+            prodTextarea.style.fontSize = "0.85rem";
+            prodTextarea.style.lineHeight = "1.4";
+            prodTextarea.rows = 4;
+            prodTextarea.style.width = "100%";
+
+            const btnBar = document.createElement("div");
+            btnBar.style.display = "flex";
+            btnBar.style.gap = "8px";
+            btnBar.style.marginBottom = "6px";
+            btnBar.style.marginTop = "4px";
+
+            function makeBtn(text, bg, fg, handler) {
+                const b = document.createElement("button");
+                b.type = "button";
+                b.textContent = text;
+                b.style.background = bg;
+                b.style.color = fg;
+                b.style.border = "1px solid #cbd5e1";
+                b.style.borderRadius = "4px";
+                b.style.padding = "3px 8px";
+                b.style.fontSize = "0.75rem";
+                b.style.cursor = "pointer";
+                b.style.fontWeight = "500";
+                b.addEventListener("click", handler);
+                return b;
+            }
+
+            const exitoSample = "3100827 | Nevera DOOR COOLING LG No Frost 420 Lts | 1 | 3.365.000\n3110648 | Nevecón SAMSUNG Tipo Europeo 625 Lts | 1 | 5.500.267\n3536928 | Aire Acondicionado DualInverter LG 9000 Btu | 1 | 1.637.935";
+            const jumboSample = "3669368 | Jugo Hit surtido pg 10 lev.12 200ml c-u | 3 | 14.550";
+
+            btnBar.appendChild(makeBtn("Cargar ejemplo ÉXITO", "#fef9c3", "#854d0e", () => {
+                prodTextarea.value = exitoSample.replace(/\\n/g, "\n");
+            }));
+            btnBar.appendChild(makeBtn("Cargar ejemplo JUMBO", "#dcfce7", "#166534", () => {
+                prodTextarea.value = jumboSample.replace(/\\n/g, "\n");
+            }));
+            btnBar.appendChild(makeBtn("Limpiar", "#f1f5f9", "#475569", () => {
+                prodTextarea.value = "";
+            }));
+
+            prodTextarea.parentNode.insertBefore(btnBar, prodTextarea);
+        }
+
         // Initialize preview
         updatePreview();
     });
