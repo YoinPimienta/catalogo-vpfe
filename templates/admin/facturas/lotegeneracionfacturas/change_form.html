@@ -258,6 +258,51 @@
         textarea.addEventListener("input", actualizarResumen);
         textarea.addEventListener("change", actualizarResumen);
         actualizarResumen();
+
+        // Interacción dinámica para Plantilla Otra / Personalizada y Factura Guía
+        const plantillaSelect = document.getElementById("id_plantilla");
+        const facturaGuiaContainer = document.querySelector(".field-factura_guia");
+
+        if (plantillaSelect && facturaGuiaContainer) {
+            const infoBox = document.createElement("div");
+            infoBox.id = "otra-plantilla-info";
+            infoBox.style.display = "none";
+            infoBox.style.background = "#0f172a";
+            infoBox.style.border = "1px solid #38bdf8";
+            infoBox.style.borderRadius = "6px";
+            infoBox.style.padding = "8px 12px";
+            infoBox.style.marginTop = "6px";
+            infoBox.style.fontSize = "0.8rem";
+            infoBox.style.color = "#38bdf8";
+            infoBox.style.lineHeight = "1.4";
+            infoBox.innerHTML = `
+                <div style="font-weight: 600; margin-bottom: 2px;">Carga de Factura Modelo (.docx)</div>
+                <div style="color: #94a3b8; font-size: 0.77rem;">
+                    Adjunta aquí el archivo Word de la factura que deseas reproducir. El sistema generará el lote automáticamente actualizando folios consecutivos, CUFE y código QR dinámicos.
+                </div>
+            `;
+            facturaGuiaContainer.appendChild(infoBox);
+
+            function toggleOtraPlantilla() {
+                const isOtra = plantillaSelect.value === "OTRA";
+                if (isOtra) {
+                    facturaGuiaContainer.style.background = "rgba(56, 189, 248, 0.05)";
+                    facturaGuiaContainer.style.border = "1px solid rgba(56, 189, 248, 0.4)";
+                    facturaGuiaContainer.style.borderRadius = "6px";
+                    facturaGuiaContainer.style.padding = "10px";
+                    infoBox.style.display = "block";
+                } else {
+                    facturaGuiaContainer.style.background = "";
+                    facturaGuiaContainer.style.border = "";
+                    facturaGuiaContainer.style.borderRadius = "";
+                    facturaGuiaContainer.style.padding = "";
+                    infoBox.style.display = "none";
+                }
+            }
+
+            plantillaSelect.addEventListener("change", toggleOtraPlantilla);
+            toggleOtraPlantilla();
+        }
     });
     </script>
 {% endblock %}

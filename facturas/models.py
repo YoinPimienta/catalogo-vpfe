@@ -283,7 +283,13 @@ class LoteGeneracionFacturas(models.Model):
     facturas_por_dia = models.PositiveIntegerField(default=3, verbose_name="Facturas por Día")
     hora_inicial = models.TimeField(default=datetime.time(8, 0), null=True, blank=True, verbose_name="Hora Inicial")
     hora_final = models.TimeField(default=datetime.time(20, 0), null=True, blank=True, verbose_name="Hora Final")
-    factura_guia = models.FileField(upload_to="facturas_guia/", null=True, blank=True, verbose_name="Plantilla Factura Guía (.docx)")
+    factura_guia = models.FileField(
+        upload_to="facturas_guia/", 
+        null=True, 
+        blank=True, 
+        verbose_name="Adjuntar Archivo Modelo (.docx)",
+        help_text="Si seleccionaste 'Otra / Personalizada', adjunta aquí la factura modelo (.docx) que preparaste para reproducirla en lote con folios consecutivos, CUFE y QR únicos."
+    )
     observaciones = models.TextField(blank=True, null=True, verbose_name="Observaciones")
     motivo_cancelacion = models.TextField(blank=True, null=True, verbose_name="Motivo de Cancelación/Desactivación")
     estado = models.CharField(max_length=20, choices=ESTADOS, default='ACTIVO', verbose_name="Estado")

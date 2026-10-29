@@ -729,14 +729,13 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
                 ('Configuración de Generación Masiva', {
                     'description': 'Selecciona la plantilla, fechas y horas. Si dejas la fecha de fin vacía, se generará la cantidad exacta indicada. Si no seleccionas Factura Base, el sistema adoptará automáticamente la plantilla seleccionada.',
                     'fields': (
-                        'plantilla',
+                        ('plantilla', 'factura_guia'),
                         'factura_base',
                         ('serie', 'folio_inicial', 'salto_folio'),
                         'cantidad_generada',
                         ('fecha_inicio', 'fecha_fin'),
                         'facturas_por_dia',
                         ('hora_inicial', 'hora_final'),
-                        'factura_guia',
                         'observaciones',
                     )
                 }),
@@ -747,10 +746,10 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
             )
         return (
             ('Información de Registro', {
-                'fields': ('plantilla', 'usuario_creador', 'fecha_creacion', 'factura_base', 'estado')
+                'fields': ('plantilla', 'factura_guia', 'usuario_creador', 'fecha_creacion', 'factura_base', 'estado')
             }),
             ('Detalle de Generación Masiva', {
-                'fields': (('serie', 'folio_inicial', 'salto_folio'), 'cantidad_generada', 'fecha_inicio', 'fecha_fin', 'facturas_por_dia', 'hora_inicial', 'hora_final', 'factura_guia', 'observaciones')
+                'fields': (('serie', 'folio_inicial', 'salto_folio'), 'cantidad_generada', 'fecha_inicio', 'fecha_fin', 'facturas_por_dia', 'hora_inicial', 'hora_final', 'observaciones')
             }),
             ('Productos del Lote', {
                 'fields': ('productos_texto',)
@@ -785,9 +784,10 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
             if not obj.factura_base:
                 obj.factura_base = Factura.objects.filter(plantilla=obj.plantilla, lote_generacion__isnull=True).first() or Factura.objects.filter(plantilla=obj.plantilla).first() or Factura.objects.order_by('-id').first()
             elif obj.factura_base.plantilla != obj.plantilla:
-                matching_base = Factura.objects.filter(plantilla=obj.plantilla, lote_generacion__isnull=True).first() or Factura.objects.filter(plantilla=obj.plantilla).first()
-                if matching_base:
-                    obj.factura_base = matching_base
+                if obj.plantilla in ('JUMBO', 'EXITO'):
+                    matching_base = Factura.objects.filter(plantilla=obj.plantilla, lote_generacion__isnull=True).first() or Factura.objects.filter(plantilla=obj.plantilla).first()
+                    if matching_base:
+                        obj.factura_base = matching_base
 
             if not obj.fecha_inicio:
                 obj.fecha_inicio = timezone.localdate()

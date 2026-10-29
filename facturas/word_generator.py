@@ -1,3 +1,4 @@
+from PIL import Image
 import os
 import io
 import re
@@ -626,31 +627,175 @@ def rellenar_plantilla_exito(doc_path, factura):
 
 def rellenar_factura_guia_estatica(doc_path, factura):
     """
-    Relleno genérico de fallback para documentos guía subidos manualmente por el usuario.
+    Relleno dinamico e inteligente para facturas subidas manualmente como guia / modelo.
+    Permite cargar 1 sola factura Word y reproducirla en lote con:
+    - Folio y Serie consecutivos actualizados por factura
+    - CUFE unico y dinamico
+    - Codigo QR dinamico apuntando a la verificacion oficial en el dominio
+    - Fecha y Hora de emision actualizadas segun la programacion del lote
+    - Codigo de barras actualizado (si la plantilla usa barcode numerico y no es Jumbo)
+    - Limpieza automatica de resaltados amarillos
     """
     doc = docx.Document(doc_path)
     base_url = os.environ.get('APP_DOMAIN') or os.environ.get('RENDER_EXTERNAL_URL') or 'https://catalogo-vpfe1.onrender.com'
-    qr_url = f"{base_url.rstrip('/')}/?cufe={factura.cufe}"
-    qr_png_bytes = generar_qr_stream(qr_url).getvalue()
+    base_url = base_url.rstrip('/')
 
-    cufe_reemplazado = False
+    cufe = factura.cufe or str(uuid.uuid4()).replace('-', '') + str(uuid.uuid4()).replace('-', '')
+    serie = factura.serie or ""
+    folio = factura.folio or ""
+    numero_factura = f"{serie}{folio}".strip()
+
+    fecha = factura.fecha_emision or timezone.localdate()
+    hora = factura.hora_emision or timezone.localtime(timezone.now()).time()
+
+    fecha_iso = fecha.strftime('%Y-%m-%d')
+    hora_iso = hora.strftime('%H:%M:%S')
+    fecha_hora_str = f"{fecha_iso} {hora_iso}"
+    fecha_latam = fecha.strftime('%d/%m/%Y')
+    fecha_corta = fecha.strftime('%d/ %m/ %y')
+    hora_corta = hora.strftime('%H : %M')
+    fecha_compact = fecha.strftime('%Y%m%d')
+
+    # Detectar base_folio y base_serie de la factura_base si existe
+    factura_base = getattr(factura.lote_generacion, 'factura_base', None) if factura.lote_generacion else None
+    base_folio = str(factura_base.folio).strip() if factura_base and factura_base.folio else None
+    base_serie = str(factura_base.serie).strip() if factura_base and factura_base.serie else None
+
+    # 1. Reemplazo de Codigo QR
+    qr_stream = generar_qr_stream(f"{base_url}/?cufe={cufe}")
+    qr_bytes = qr_stream.getvalue()
+
+    qr_rid_identified = None
     for i, p in enumerate(doc.paragraphs):
-        text = p.text
-        if 'CUFE :' in text or 'CUFE:' in text:
-            if i + 1 < len(doc.paragraphs):
-                next_p = doc.paragraphs[i + 1]
-                if len(next_p.text.strip()) > 20:
-                    next_p.text = factura.cufe
-                    cufe_reemplazado = True
-
-        if cufe_reemplazado and ('drawing' in p._p.xml or 'graphic' in p._p.xml):
-            embed_ids = re.findall(r'embed=[\x22\x27]([^\x22\x27]+)', p._p.xml)
-            for rId in embed_ids:
-                if rId in doc.part.rels:
-                    target_part = doc.part.rels[rId].target_part
-                    if 'image' in target_part.content_type:
-                        target_part._blob = qr_png_bytes
+        if 'CUFE' in p.text.upper() or 'QR' in p.text.upper():
+            for cand_p in doc.paragraphs[i:min(i + 4, len(doc.paragraphs))]:
+                if 'drawing' in cand_p._p.xml or 'graphic' in cand_p._p.xml:
+                    eids = re.findall(r'embed=[\x22\x27]([^\x22\x27]+)', cand_p._p.xml)
+                    if eids:
+                        qr_rid_identified = eids[0]
                         break
+            if qr_rid_identified:
+                break
+
+    if qr_rid_identified and qr_rid_identified in doc.part.rels:
+        doc.part.rels[qr_rid_identified].target_part._blob = qr_bytes
+    else:
+        for rId, rel in doc.part.rels.items():
+            if 'image' in rel.target_ref or 'image' in getattr(rel.target_part, 'content_type', ''):
+                try:
+                    img = Image.open(io.BytesIO(rel.target_part._blob))
+                    ratio = img.width / float(img.height or 1)
+                    if 0.8 <= ratio <= 1.25 and img.width >= 100:
+                        rel.target_part._blob = qr_bytes
+                except Exception:
+                    pass
+
+    # 2. Reemplazo de Barcode (si existe y tiene ratio >= 2.0 y la plantilla no es JUMBO)
+    is_jumbo = 'jumbo' in os.path.basename(doc_path).lower() or getattr(factura, 'plantilla', '') == 'JUMBO'
+    if not is_jumbo and numero_factura:
+        for rId, rel in doc.part.rels.items():
+            if 'image' in rel.target_ref or 'image' in getattr(rel.target_part, 'content_type', ''):
+                try:
+                    img = Image.open(io.BytesIO(rel.target_part._blob))
+                    ratio = img.width / float(img.height or 1)
+                    if ratio >= 2.2:
+                        bc_stream = generar_barcode_stream(numero_factura)
+                        rel.target_part._blob = bc_stream.getvalue()
+                        break
+                except Exception:
+                    pass
+
+    def reemplazar_en_parrafo(parrafo, target_regex, replacement_text):
+        if re.search(target_regex, parrafo.text):
+            for run in parrafo.runs:
+                if re.search(target_regex, run.text):
+                    run.text = re.sub(target_regex, replacement_text, run.text)
+                    return True
+            if parrafo.runs:
+                parrafo.runs[0].text = re.sub(target_regex, replacement_text, parrafo.text)
+                for run in parrafo.runs[1:]:
+                    run.text = ""
+            else:
+                parrafo.text = re.sub(target_regex, replacement_text, parrafo.text)
+            return True
+        return False
+
+    # 3. Reemplazo en parrafos
+    total_paragraphs = len(doc.paragraphs)
+    for idx, p in enumerate(doc.paragraphs):
+        p_text = p.text
+
+        # CUFE
+        if 'CUFE :' in p_text or 'CUFE:' in p_text or 'Cufe:' in p_text:
+            m_hex = re.search(r'(?:CUFE\s*:\s*|Cufe:)([0-9a-fA-F]{20,})', p_text)
+            if m_hex and idx + 1 < total_paragraphs and re.match(r'^[0-9a-fA-F]{15,}$', doc.paragraphs[idx + 1].text.strip()):
+                p.text = f"Cufe:{cufe[:34]}"
+                doc.paragraphs[idx + 1].text = cufe[34:64]
+                continue
+            elif m_hex:
+                p.text = re.sub(r'(?:CUFE\s*:\s*|Cufe:)[0-9a-fA-F]{20,}', f"Cufe:{cufe}", p_text)
+                continue
+            elif idx + 1 < total_paragraphs:
+                next_p = doc.paragraphs[idx + 1]
+                if re.match(r'^[0-9a-fA-F]{30,}$', next_p.text.strip()) or len(next_p.text.strip()) > 25:
+                    next_p.text = cufe
+                    continue
+        elif re.match(r'^[0-9a-fA-F]{40,96}$', p_text.strip()):
+            p.text = cufe
+            continue
+
+        # Reemplazo de Folio y Serie
+        if base_folio and base_folio in p_text:
+            if base_serie and f"{base_serie}{base_folio}" in p_text:
+                reemplazar_en_parrafo(p, re.escape(f"{base_serie}{base_folio}"), f"{serie}{folio}")
+            elif base_serie and f"{base_serie}-{base_folio}" in p_text:
+                reemplazar_en_parrafo(p, re.escape(f"{base_serie}-{base_folio}"), f"{serie}-{folio}")
+            elif base_serie and f"{base_serie}- {base_folio}" in p_text:
+                reemplazar_en_parrafo(p, re.escape(f"{base_serie}- {base_folio}"), f"{serie}- {folio}")
+            elif base_serie and f"{base_serie}  {base_folio}" in p_text:
+                reemplazar_en_parrafo(p, re.escape(f"{base_serie}  {base_folio}"), f"{serie}  {folio}")
+            elif base_serie and f"{base_serie} {base_folio}" in p_text:
+                reemplazar_en_parrafo(p, re.escape(f"{base_serie} {base_folio}"), f"{serie} {folio}")
+            else:
+                reemplazar_en_parrafo(p, re.escape(base_folio), folio)
+        elif 'NUMERO:' in p_text.upper():
+            reemplazar_en_parrafo(p, r'(NUMERO:\s*)([A-Za-z0-9\-_]+)', fr"\g<1>{numero_factura}")
+        elif 'FACTURADOR  :' in p_text:
+            reemplazar_en_parrafo(p, r'(FACTURADOR\s*:\s*)([A-Za-z0-9]+-\s*[0-9]+)', fr"\g<1>{serie}- {folio}")
+        elif 'FAC.    ELECTRONICA   DE  VENTA' in p_text:
+            reemplazar_en_parrafo(p, r'(FAC\.\s+ELECTRONICA\s+DE\s+VENTA\s+)([A-Za-z0-9]+\s+[0-9]+)', fr"\g<1>{serie}  {folio}")
+
+        # Reemplazo de Fechas y Horas
+        if 'Expedicion' in p_text and ':' in p_text:
+            reemplazar_en_parrafo(p, r'\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}', fecha_hora_str)
+        elif re.search(r'\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}', p_text):
+            reemplazar_en_parrafo(p, r'\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}', fecha_hora_str)
+        elif re.search(r'\d{2}/\s*\d{2}/\s*\d{2,4}', p_text) and re.search(r'\d{2}\s*:\s*\d{2}', p_text):
+            reemplazar_en_parrafo(p, r'\d{2}\s*:\s*\d{2}', hora_corta)
+            reemplazar_en_parrafo(p, r'\d{2}/\s*\d{2}/\s*\d{2}', fecha_corta)
+        elif '>> MAPA:' in p_text:
+            reemplazar_en_parrafo(p, r'ID:\s*\d{8}-', f"ID: {fecha_compact}-")
+        elif 'NUTRX:' in p_text:
+            reemplazar_en_parrafo(p, r'NUTRX:\d{8}', f"NUTRX:{fecha_compact}")
+
+    # 4. Procesar tablas si las hay
+    for t in doc.tables:
+        for row in t.rows:
+            for cell in row.cells:
+                c_text = cell.text
+                if base_folio and base_folio in c_text:
+                    if base_serie and f"{base_serie}{base_folio}" in c_text:
+                        cell.text = cell.text.replace(f"{base_serie}{base_folio}", f"{serie}{folio}")
+                    elif base_serie and f"{base_serie}-{base_folio}" in c_text:
+                        cell.text = cell.text.replace(f"{base_serie}-{base_folio}", f"{serie}-{folio}")
+                    else:
+                        cell.text = cell.text.replace(base_folio, folio)
+                elif 'NUMERO:' in c_text.upper():
+                    cell.text = re.sub(r'(NUMERO:\s*)([A-Za-z0-9\-_]+)', fr"\g<1>{numero_factura}", cell.text, flags=re.IGNORECASE)
+                if 'CUFE' in c_text.upper():
+                    m_hex = re.search(r'[0-9a-fA-F]{30,}', c_text)
+                    if m_hex:
+                        cell.text = cell.text.replace(m_hex.group(0), cufe)
 
     limpiar_resaltados(doc)
     return doc
@@ -681,6 +826,34 @@ def generar_documento_factura(factura, template_path=None):
 
     filename_lower = os.path.basename(tpl_path).lower()
     plantilla_tipo = getattr(factura, 'plantilla', '').upper()
+
+    # Si el lote tiene plantilla personalizada subida por el usuario (factura_guia) o plantilla == 'OTRA':
+    if factura.lote_generacion and factura.lote_generacion.factura_guia and os.path.exists(factura.lote_generacion.factura_guia.path):
+        if plantilla_tiene_jinja(tpl_path):
+            docxtpl_obj = DocxTemplate(tpl_path)
+            context = {
+                'serie': factura.serie,
+                'folio': factura.folio,
+                'cufe': factura.cufe,
+                'fecha_emision': factura.fecha_emision.strftime('%d/%m/%Y') if factura.fecha_emision else '',
+                'hora_emision': factura.hora_emision.strftime('%H:%M:%S') if factura.hora_emision else '',
+                'total': fmt_pesos(factura.total),
+                'subtotal': fmt_pesos(factura.subtotal or factura.total),
+                'iva': fmt_pesos(factura.iva),
+                'emisor_nombre': factura.emisor_nombre,
+                'emisor_nit': factura.emisor_nit,
+                'receptor_nombre': factura.receptor_nombre,
+                'receptor_nit': factura.receptor_nit,
+            }
+            docxtpl_obj.render(context)
+            out_stream = io.BytesIO()
+            docxtpl_obj.save(out_stream)
+            out_stream.seek(0)
+            doc = docx.Document(out_stream)
+            limpiar_resaltados(doc)
+            return doc
+        else:
+            return rellenar_factura_guia_estatica(tpl_path, factura)
 
     if plantilla_tipo == 'JUMBO' or 'jumbo' in filename_lower:
         return rellenar_plantilla_jumbo(tpl_path, factura)
