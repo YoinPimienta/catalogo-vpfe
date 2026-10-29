@@ -110,7 +110,7 @@ def restaurar_datos(apps, schema_editor):
     Factura.objects.filter(lote_generacion__isnull=True).exclude(id__in=base_ids).delete()
 
     # 5. Asegurar existencia de los Lotes de Generacion
-    if LoteGeneracionFacturas.objects.count() == 0:
+    if not LoteGeneracionFacturas.objects.filter(plantilla='JUMBO').exists():
         lote1 = LoteGeneracionFacturas.objects.create(
             plantilla='JUMBO',
             usuario_creador=admin_user,
@@ -147,6 +147,7 @@ def restaurar_datos(apps, schema_editor):
                 estado='Aceptada'
             )
 
+    if not LoteGeneracionFacturas.objects.filter(plantilla='EXITO').exists():
         lote2 = LoteGeneracionFacturas.objects.create(
             plantilla='EXITO',
             usuario_creador=admin_user,

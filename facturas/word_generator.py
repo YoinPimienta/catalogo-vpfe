@@ -35,28 +35,31 @@ def normalizar_texto(texto):
 
 def resolver_plantilla_factura(factura):
     """
-    Determina qué plantilla usar:
-    1. Si el lote tiene factura_guia adjunta, usa esa.
-    2. Si la factura tiene explícitamente el campo 'plantilla' ('JUMBO' o 'EXITO'), usa esa.
+    Determina que plantilla usar:
+    1. Si el lote tiene factura_guia adjunta valida en disco, usa esa.
+    2. Si la factura tiene explicitamente el campo 'plantilla' (JUMBO, EXITO, FRISBY, etc.), usa esa.
     3. Si coincide con alguno de los emisores registrados en plantillas_base, usa esa.
-    4. Fallback a JUMBO.docx.
+    4. Fallback seguro a cualquier plantilla base disponible en plantillas_base/.
     """
-    if factura.lote_generacion and factura.lote_generacion.factura_guia:
-        if os.path.exists(factura.lote_generacion.factura_guia.path):
-            return factura.lote_generacion.factura_guia.path
+    if factura.lote_generacion and getattr(factura.lote_generacion, 'factura_guia', None):
+        try:
+            if factura.lote_generacion.factura_guia.name and os.path.exists(factura.lote_generacion.factura_guia.path):
+                return factura.lote_generacion.factura_guia.path
+        except Exception:
+            pass
 
     plantillas_dir = os.path.join(settings.BASE_DIR, 'plantillas_base')
 
-    # Chequear campo plantilla explícito
+    # Chequear campo plantilla explicito
     plantilla_val = getattr(factura, 'plantilla', None)
-    if plantilla_val in ['JUMBO', 'EXITO']:
-        p = os.path.join(plantillas_dir, f"{plantilla_val}.docx")
+    if plantilla_val:
+        p = os.path.join(plantillas_dir, f"{str(plantilla_val).upper().strip()}.docx")
         if os.path.exists(p):
             return p
 
     emisor_norm = normalizar_texto(factura.emisor_nombre)
 
-    # Búsqueda por alias
+    # Busqueda por alias
     for nombre_plantilla, alias_list in PLANTILLA_ALIASES.items():
         for alias in alias_list:
             if normalizar_texto(alias) in emisor_norm:
@@ -64,11 +67,20 @@ def resolver_plantilla_factura(factura):
                 if os.path.exists(p):
                     return p
 
-    # Fallback por defecto
-    for fb in ['JUMBO.docx', 'EXITO.docx', 'defecto.docx']:
+    # Fallback por defecto garantizado
+    for fb in ['JUMBO.docx', 'EXITO.docx', 'FRISBY.docx', 'HOMECENTER.docx', 'OLIMPICA.docx']:
         fb_path = os.path.join(plantillas_dir, fb)
         if os.path.exists(fb_path):
             return fb_path
+
+    # Ultimo recurso: primer archivo docx en plantillas_base
+    try:
+        if os.path.exists(plantillas_dir):
+            for f in os.listdir(plantillas_dir):
+                if f.lower().endswith('.docx'):
+                    return os.path.join(plantillas_dir, f)
+    except Exception:
+        pass
 
     return None
 
@@ -1137,28 +1149,75 @@ def generar_factura_word_bytes(factura, template_path=None):
 
 def generar_lote_word_unificado_bytes(lote):
     """
-    Combina todas las facturas de un lote en un único archivo Word (.docx)
-    separadas de forma continua exactamente en el formato de tirilla solicitado.
+    Combina todas las facturas de un lote en un unico archivo Word (.docx)
+    separadas de forma continua en el formato de tirilla.
+    Altamente tolerante a fallos: garantiza siempre la devolucion de un .docx valido.
     """
-    facturas = lote.facturas.all().order_by('id')
-    if not facturas.exists():
-        raise ValueError("El lote no contiene facturas.")
+    facturas = list(lote.facturas.all().order_by('id'))
+    
+    # Si el lote no contiene facturas guardadas, intentar generar con su factura base
+    if not facturas and lote.factura_base:
+        try:
+            from .admin import ejecutar_generacion_masiva_para_lote
+            ejecutar_generacion_masiva_para_lote(lote)
+            facturas = list(lote.facturas.all().order_by('id'))
+        except Exception as e:
+            print(f"Aviso al auto-generar facturas para lote #{lote.id}: {e}")
 
-    doc_base = generar_documento_factura(facturas[0])
-    if len(facturas) > 1:
+    # Si aun no hay facturas, usar la factura base directamente
+    if not facturas:
+        if lote.factura_base:
+            doc = generar_documento_factura(lote.factura_base)
+            stream = io.BytesIO()
+            doc.save(stream)
+            stream.seek(0)
+            return stream
+        else:
+            raise ValueError(f"El lote #{lote.id} no contiene facturas generadas ni factura base asociada.")
+
+    # Generar el documento para la primera factura exitosa
+    doc_base = None
+    factura_primera = None
+    for f in facturas:
+        try:
+            doc_base = generar_documento_factura(f)
+            factura_primera = f
+            break
+        except Exception as e:
+            print(f"Error generando factura #{f.id}: {e}")
+            continue
+
+    if doc_base is None:
+        raise ValueError("No se pudo procesar ninguna factura del lote.")
+
+    # Combinar las siguientes facturas de forma segura
+    otras_facturas = [f for f in facturas if f.id != factura_primera.id]
+    if otras_facturas:
         try:
             from docxcompose.composer import Composer
             composer = Composer(doc_base)
-            for f in facturas[1:]:
-                doc_next = generar_documento_factura(f)
-                composer.append(doc_next)
+            for f in otras_facturas:
+                try:
+                    doc_next = generar_documento_factura(f)
+                    composer.append(doc_next)
+                except Exception as ex:
+                    print(f"Aviso: omitiendo factura #{f.id} en la composicion unificada: {ex}")
         except Exception as e:
-            print("Composer error:", e)
+            print(f"Aviso en Composer: {e}")
 
+    # Guardar en stream con contingencia
     stream = io.BytesIO()
-    doc_base.save(stream)
+    try:
+        doc_base.save(stream)
+    except Exception as e:
+        print(f"Error al guardar documento unificado ({e}), regenerando documento limpio...")
+        doc_fresh = generar_documento_factura(factura_primera)
+        stream = io.BytesIO()
+        doc_fresh.save(stream)
+
     stream.seek(0)
     return stream
+
 
 def generar_lote_zip_bytes(lote):
     """

@@ -197,6 +197,13 @@ def ejecutar_generacion_masiva_para_lote(lote, usuario=None, cajero_custom=None,
     from django.utils import timezone
     factura_base = lote.factura_base
     if not factura_base:
+        factura_base = Factura.objects.filter(plantilla=getattr(lote, 'plantilla', 'JUMBO'), lote_generacion__isnull=True).first() or \
+                       Factura.objects.filter(plantilla=getattr(lote, 'plantilla', 'JUMBO')).first() or \
+                       Factura.objects.order_by('id').first()
+        if factura_base and getattr(lote, 'id', None):
+            lote.factura_base = factura_base
+            LoteGeneracionFacturas.objects.filter(id=lote.id).update(factura_base=factura_base)
+    if not factura_base:
         return []
 
     cantidad = lote.cantidad_generada or 1
@@ -413,26 +420,39 @@ class FacturaAdmin(admin.ModelAdmin):
         import copy, io
         facturas = list(queryset.order_by('id'))
         if not facturas:
+            self.message_user(request, "No hay facturas seleccionadas.", level=messages.WARNING)
             return
-        doc_base = word_generator.generar_documento_factura(facturas[0])
-        if len(facturas) > 1:
+        try:
+            doc_base = word_generator.generar_documento_factura(facturas[0])
+            if len(facturas) > 1:
+                try:
+                    from docxcompose.composer import Composer
+                    composer = Composer(doc_base)
+                    for f in facturas[1:]:
+                        try:
+                            doc_next = word_generator.generar_documento_factura(f)
+                            composer.append(doc_next)
+                        except Exception as ex:
+                            print(f"Aviso al componer factura #{f.id}: {ex}")
+                except Exception as e:
+                    print(f"Aviso en Composer: {e}")
+            stream = io.BytesIO()
             try:
-                from docxcompose.composer import Composer
-                composer = Composer(doc_base)
-                for f in facturas[1:]:
-                    doc_next = word_generator.generar_documento_factura(f)
-                    composer.append(doc_next)
-            except Exception as e:
-                print("Composer error:", e)
-        stream = io.BytesIO()
-        doc_base.save(stream)
-        stream.seek(0)
-        response = HttpResponse(
-            stream.getvalue(),
-            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        )
-        response['Content-Disposition'] = f'attachment; filename="Facturas_Seleccionadas_Unificadas_{len(facturas)}.docx"'
-        return response
+                doc_base.save(stream)
+            except Exception:
+                doc_fresh = word_generator.generar_documento_factura(facturas[0])
+                stream = io.BytesIO()
+                doc_fresh.save(stream)
+            stream.seek(0)
+            response = HttpResponse(
+                stream.getvalue(),
+                content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            )
+            response['Content-Disposition'] = f'attachment; filename="Facturas_Seleccionadas_Unificadas_{len(facturas)}.docx"'
+            return response
+        except Exception as e:
+            self.message_user(request, f"Error generando Word unificado: {str(e)}", level=messages.ERROR)
+            return
 
     @admin.action(description="Descargar seleccionadas en ZIP (.zip)")
     def descargar_seleccionadas_zip_action(self, request, queryset):

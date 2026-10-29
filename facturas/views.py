@@ -1,13 +1,29 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect, get_object_or_404
 from django.template.loader import render_to_string
 from django.http import HttpResponse, JsonResponse
 from django.conf import settings
-from .models import Factura
-from docxtpl import DocxTemplate, InlineImage
-from docx.shared import Mm
+from django.contrib import messages
+from django.contrib.auth.models import User
+from .models import Factura, LoteGeneracionFacturas
 import io
 import os
-import base64
+import re
+import unicodedata
+import traceback
+
+PLANTILLA_ALIASES = {
+    "EXITO": ["EXITO", "ALMACENES EXITO", "ALMACENES EXITO SA", "ALMACENES EXITO S.A"],
+    "FRISBY": ["FRISBY", "FRISBY SA", "FRISBY S.A", "FRISBY S.A. BIC", "FRISBY BIC"],
+    "HOMECENTER": ["HOMECENTER", "SODIMAC", "SODIMAC COLOMBIA", "SODIMAC COLOMBIA SA"],
+    "JUMBO": ["JUMBO", "CENCOSUD", "CENCOSUD COLOMBIA", "CENCOSUD COLOMBIA S.A"],
+    "OLIMPICA": ["OLIMPICA", "OLIMPICA SA", "OLIMPICA S.A"]
+}
+
+def normalizar_texto(texto):
+    if not texto:
+        return ""
+    texto_norm = unicodedata.normalize('NFKD', str(texto)).encode('ASCII', 'ignore').decode('utf-8')
+    return texto_norm.upper().strip()
 
 def buscar_factura(request):
     cufe = request.GET.get('cufe') or request.POST.get('cufe')
@@ -30,6 +46,7 @@ def buscar_factura(request):
             error = "Ocurrió un error inesperado al procesar la búsqueda."
 
     return render(request, 'buscar.html', {'error': error, 'cufe': cufe})
+
 def ver_factura(request, cufe):
     try:
         factura = Factura.objects.get(cufe=cufe)
@@ -45,72 +62,25 @@ def descargar_pdf_factura(request, cufe):
         from django.db.models import F
         factura = Factura.objects.get(cufe=cufe)
         
-        # Registrar descarga para auditoría
         Factura.objects.filter(pk=factura.pk).update(descargas=F('descargas') + 1)
-        
         factura.recalcular_totales()
         factura.generar_qr()
         html_string = render_to_string('factura_pdf.html', {'factura': factura, 'request': request})
         
-        # Generar el PDF
         pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri('/')).write_pdf()
         
-        current_serie = factura.serie if factura.serie else "I0"
-        current_folio = factura.folio if factura.folio else "00"
+        safe_serie = re.sub(r'[^a-zA-Z0-9_\-]', '', str(factura.serie or 'I0'))
+        safe_folio = re.sub(r'[^a-zA-Z0-9_\-]', '', str(factura.folio or '00'))
         
         response = HttpResponse(pdf_file, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="Factura_{current_serie}_{current_folio}.pdf"'
+        response['Content-Disposition'] = f'attachment; filename="Factura_{safe_serie}_{safe_folio}.pdf"'
         return response
     except Factura.DoesNotExist:
         return HttpResponse("Factura no encontrada.", status=404)
     except Exception as e:
-        import traceback
         error_msg = f"Error generando PDF: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
         print(error_msg)
-        return HttpResponse(error_msg, status=500, content_type="text/plain")
-
-import unicodedata
-
-PLANTILLA_ALIASES = {
-    "EXITO": ["EXITO", "ALMACENES EXITO", "ALMACENES EXITO SA", "ALMACENES EXITO S.A"],
-    "FRISBY": ["FRISBY", "FRISBY SA", "FRISBY S.A", "FRISBY S.A. BIC", "FRISBY BIC"],
-    "HOMECENTER": ["HOMECENTER", "SODIMAC", "SODIMAC COLOMBIA", "SODIMAC COLOMBIA SA"],
-    "JUMBO": ["JUMBO", "CENCOSUD", "CENCOSUD COLOMBIA", "CENCOSUD COLOMBIA S.A"],
-    "OLIMPICA": ["OLIMPICA", "OLIMPICA SA", "OLIMPICA S.A"]
-}
-
-def normalizar_texto(texto):
-    if not texto: return ""
-    texto_norm = unicodedata.normalize('NFKD', texto).encode('ASCII', 'ignore').decode('utf-8')
-    return texto_norm.upper().strip()
-
-def resolver_plantilla_por_emisor(emisor_nombre, plantillas_dir):
-    emisor_norm = normalizar_texto(emisor_nombre)
-    
-    # 1. Búsqueda por diccionario de alias (incluye coincidencias parciales)
-    for nombre_plantilla, alias_list in PLANTILLA_ALIASES.items():
-        for alias in alias_list:
-            if normalizar_texto(alias) in emisor_norm:
-                path = os.path.join(plantillas_dir, f"{nombre_plantilla}.docx")
-                if os.path.exists(path):
-                    return path
-
-    # 2. Búsqueda flexible en los nombres de archivos físicos .docx
-    if os.path.exists(plantillas_dir):
-        for filename in os.listdir(plantillas_dir):
-            if filename.endswith('.docx') and filename.upper() != 'DEFECTO.DOCX':
-                name_without_ext = normalizar_texto(filename[:-5])
-                if name_without_ext and name_without_ext in emisor_norm:
-                    path = os.path.join(plantillas_dir, filename)
-                    if os.path.exists(path):
-                        return path
-                        
-    # 3. Fallback a la plantilla por defecto si existe
-    defecto_path = os.path.join(plantillas_dir, 'defecto.docx')
-    if os.path.exists(defecto_path):
-        return defecto_path
-        
-    return None
+        return HttpResponse(error_msg, status=400, content_type="text/plain; charset=utf-8")
 
 def descargar_word_factura(request, cufe):
     try:
@@ -118,38 +88,36 @@ def descargar_word_factura(request, cufe):
         from . import word_generator
         factura = Factura.objects.get(cufe=cufe)
         
-        # Registrar descarga para auditoría
         Factura.objects.filter(pk=factura.pk).update(descargas=F('descargas') + 1)
         factura.recalcular_totales()
         factura.generar_qr()
         
         file_stream = word_generator.generar_factura_word_bytes(factura)
         
+        safe_serie = re.sub(r'[^a-zA-Z0-9_\-]', '', str(factura.serie or 'I0'))
+        safe_folio = re.sub(r'[^a-zA-Z0-9_\-]', '', str(factura.folio or '00'))
+        
         response = HttpResponse(
             file_stream.getvalue(),
             content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         )
-        current_serie = factura.serie if factura.serie else "I0"
-        current_folio = factura.folio if factura.folio else "00"
-        response['Content-Disposition'] = f'attachment; filename="Factura_{current_serie}_{current_folio}.docx"'
+        response['Content-Disposition'] = f'attachment; filename="Factura_{safe_serie}_{safe_folio}.docx"'
         return response
     except Factura.DoesNotExist:
         return HttpResponse("Factura no encontrada.", status=404)
     except Exception as e:
-        import traceback
         error_msg = f"Error generando Word: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
         print(error_msg)
-        return HttpResponse(error_msg, status=500, content_type="text/plain")
+        return HttpResponse(error_msg, status=400, content_type="text/plain; charset=utf-8")
 
 def previsualizar_tirilla(request, cufe):
-    from django.shortcuts import get_object_or_404
     from .word_generator import generar_documento_factura
     factura = get_object_or_404(Factura, cufe=cufe)
     if not factura.qr_code:
         factura.generar_qr()
 
     doc = generar_documento_factura(factura)
-    plantilla = factura.plantilla or 'JUMBO'
+    plantilla = (factura.plantilla or 'JUMBO').upper()
     qr_rid = 'rId6' if plantilla == 'EXITO' else 'rId8'
     bc_rid = 'rId7' if plantilla == 'EXITO' else 'rId9'
 
@@ -195,65 +163,108 @@ def previsualizar_tirilla(request, cufe):
         'lineas_tirilla': lineas_tirilla,
         'barcode_img_src': barcode_img_src or getattr(factura, 'barcode_image', None),
     })
+
 def descargar_lote_word_unificado(request, lote_id):
     try:
-        from .models import LoteGeneracionFacturas
         from . import word_generator
-        lote = LoteGeneracionFacturas.objects.get(pk=lote_id)
-        
+
+        lote = LoteGeneracionFacturas.objects.filter(pk=lote_id).first()
+        if not lote:
+            messages.error(request, f"Lote #{lote_id} no encontrado.")
+            return redirect('admin:facturas_lotegeneracionfacturas_changelist')
+
         stream = word_generator.generar_lote_word_unificado_bytes(lote)
-        serie = lote.factura_base.serie if lote.factura_base else "VPFE"
+        
+        serie = "VPFE"
+        if lote.factura_base and lote.factura_base.serie:
+            serie = re.sub(r'[^a-zA-Z0-9_\-]', '', str(lote.factura_base.serie))
+        elif getattr(lote, 'serie', None):
+            serie = re.sub(r'[^a-zA-Z0-9_\-]', '', str(lote.serie))
+
+        filename = f"Lote_{lote.id}_Facturas_Unificadas_{serie}.docx"
         response = HttpResponse(
             stream.getvalue(),
             content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         )
-        response['Content-Disposition'] = f'attachment; filename="Lote_{lote.id}_Facturas_Unificadas_{serie}.docx"'
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
-    except LoteGeneracionFacturas.DoesNotExist:
-        return HttpResponse("Lote no encontrado.", status=404)
+
     except Exception as e:
-        import traceback
-        return HttpResponse(f"Error generando Word unificado: {str(e)}\n\n{traceback.format_exc()}", status=500, content_type="text/plain")
+        tb = traceback.format_exc()
+        print(f"Error generando Word unificado: {e}\n{tb}")
+        # Contingencia garantizada: descargar la primera factura individual del lote
+        try:
+            from . import word_generator
+            lote = LoteGeneracionFacturas.objects.filter(pk=lote_id).first()
+            if lote:
+                f_target = lote.facturas.first() or lote.factura_base
+                if f_target:
+                    f_stream = word_generator.generar_factura_word_bytes(f_target)
+                    response = HttpResponse(
+                        f_stream.getvalue(),
+                        content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                    )
+                    safe_f = re.sub(r'[^a-zA-Z0-9_\-]', '', str(f_target.folio or '01'))
+                    response['Content-Disposition'] = f'attachment; filename="Lote_{lote.id}_Factura_{safe_f}.docx"'
+                    return response
+        except Exception as e_inner:
+            print(f"Error en contingencia de descarga individual: {e_inner}")
+
+        messages.error(request, f"No se pudo generar el Word unificado para el lote #{lote_id}: {str(e)}")
+        referer = request.META.get('HTTP_REFERER')
+        if referer:
+            return redirect(referer)
+        return redirect('admin:facturas_lotegeneracionfacturas_changelist')
 
 def descargar_lote_zip(request, lote_id):
     try:
-        from .models import LoteGeneracionFacturas
         from . import word_generator
-        lote = LoteGeneracionFacturas.objects.get(pk=lote_id)
-        
+
+        lote = LoteGeneracionFacturas.objects.filter(pk=lote_id).first()
+        if not lote:
+            messages.error(request, f"Lote #{lote_id} no encontrado.")
+            return redirect('admin:facturas_lotegeneracionfacturas_changelist')
+
         zip_stream = word_generator.generar_lote_zip_bytes(lote)
-        serie = lote.factura_base.serie if lote.factura_base else "VPFE"
+        
+        serie = "VPFE"
+        if lote.factura_base and lote.factura_base.serie:
+            serie = re.sub(r'[^a-zA-Z0-9_\-]', '', str(lote.factura_base.serie))
+        elif getattr(lote, 'serie', None):
+            serie = re.sub(r'[^a-zA-Z0-9_\-]', '', str(lote.serie))
+
+        filename = f"Lote_{lote.id}_Facturas_{serie}.zip"
         response = HttpResponse(
             zip_stream.getvalue(),
             content_type='application/zip'
         )
-        response['Content-Disposition'] = f'attachment; filename="Lote_{lote.id}_Facturas_{serie}.zip"'
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
-    except LoteGeneracionFacturas.DoesNotExist:
-        return HttpResponse("Lote no encontrado.", status=404)
+
     except Exception as e:
-        import traceback
-        return HttpResponse(f"Error generando ZIP: {str(e)}\n\n{traceback.format_exc()}", status=500, content_type="text/plain")
+        tb = traceback.format_exc()
+        print(f"Error generando ZIP lote {lote_id}: {e}\n{tb}")
+        messages.error(request, f"No se pudo generar el ZIP para el lote #{lote_id}: {str(e)}")
+        referer = request.META.get('HTTP_REFERER')
+        if referer:
+            return redirect(referer)
+        return redirect('admin:facturas_lotegeneracionfacturas_changelist')
 
 def crear_admin(request):
     try:
         User.objects.filter(username='admin').delete()
-
         user = User.objects.create_superuser(
             username='admin',
             email='admin@test.com',
             password='admin123'
         )
-
         return HttpResponse(f"Admin recreado: {user.username}")
-
     except Exception as e:
         return HttpResponse(f"Error creando admin: {str(e)}", status=500)
 
 def buscar_datos_emisor(request):
     emisor_nombre = request.GET.get('emisor_nombre', '')
     if emisor_nombre:
-        # Obtain the most recent Factura with roughly the same emisor
         factura = Factura.objects.filter(emisor_nombre__icontains=emisor_nombre).order_by('-id').first()
         if factura:
             data = {
