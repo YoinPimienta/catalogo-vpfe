@@ -10,13 +10,13 @@ def restaurar_datos(apps, schema_editor):
 
     admin_user = User.objects.filter(is_superuser=True).first() or User.objects.first()
 
-    # 1. Base Jumbo
-    f_jumbo = Factura.objects.filter(plantilla='JUMBO', lote_generacion__isnull=True).order_by('id').first()
+    # 1. Base Jumbo (Cencosud)
+    f_jumbo = Factura.objects.filter(emisor_nombre__icontains='CENCOSUD', lote_generacion__isnull=True).order_by('id').first()
     if not f_jumbo:
         f_jumbo = Factura.objects.create(
             plantilla='JUMBO',
             serie="AU06",
-            folio="3425557",
+            folio="3425555",
             emisor_nombre='CENCOSUD COLOMBIA S.A',
             emisor_nit='900.155.107-1',
             emisor_municipio='JUMBO SANTA FE - MEDELLIN',
@@ -31,6 +31,12 @@ def restaurar_datos(apps, schema_editor):
             subtotal=Decimal('35357.00'),
             iva=Decimal('8293.00'),
             total=Decimal('43650.00'),
+            otros_impuestos=Decimal('0.00'),
+            descuento_global=Decimal('0.00'),
+            recargo_global=Decimal('0.00'),
+            anticipos=Decimal('0.00'),
+            rete_fuente=Decimal('0.00'),
+            rete_iva=Decimal('0.00'),
             estado='Aceptada',
             notas_finales='GRAN CONTRIBUYENTE SEGÚN RESOLUCION DIAN No.000200 DE DICIEMBRE 27 DE 2024'
         )
@@ -43,8 +49,8 @@ def restaurar_datos(apps, schema_editor):
             total_linea=Decimal('43650.00')
         )
 
-    # 2. Base Exito
-    f_exito = Factura.objects.filter(plantilla='EXITO', lote_generacion__isnull=True).order_by('id').first()
+    # 2. Base Exito (Almacenes Exito)
+    f_exito = Factura.objects.filter(emisor_nombre__icontains='EXITO', lote_generacion__isnull=True).order_by('id').first()
     if not f_exito:
         f_exito = Factura.objects.create(
             plantilla='EXITO',
@@ -66,6 +72,12 @@ def restaurar_datos(apps, schema_editor):
             subtotal=Decimal('8826220.00'),
             iva=Decimal('1676982.00'),
             total=Decimal('10503202.00'),
+            otros_impuestos=Decimal('0.00'),
+            descuento_global=Decimal('0.00'),
+            recargo_global=Decimal('0.00'),
+            anticipos=Decimal('0.00'),
+            rete_fuente=Decimal('0.00'),
+            rete_iva=Decimal('0.00'),
             estado='Aceptada',
             notas_finales='RESPONSABLE DE IVA-GRAN CONTRIBUYENTE - AUTORETENEDOR RES.8825 DE 16/NOV/2016'
         )
@@ -93,6 +105,12 @@ def restaurar_datos(apps, schema_editor):
             subtotal=Decimal('36681.00'),
             iva=Decimal('6969.00'),
             total=Decimal('43650.00'),
+            otros_impuestos=Decimal('0.00'),
+            descuento_global=Decimal('0.00'),
+            recargo_global=Decimal('0.00'),
+            anticipos=Decimal('0.00'),
+            rete_fuente=Decimal('0.00'),
+            rete_iva=Decimal('0.00'),
             fecha_emision=datetime.date.today(),
             hora_emision=datetime.time(12, 0)
         )
@@ -144,6 +162,12 @@ def restaurar_datos(apps, schema_editor):
                 subtotal=f_jumbo.subtotal,
                 iva=f_jumbo.iva,
                 total=f_jumbo.total,
+                otros_impuestos=Decimal('0.00'),
+                descuento_global=Decimal('0.00'),
+                recargo_global=Decimal('0.00'),
+                anticipos=Decimal('0.00'),
+                rete_fuente=Decimal('0.00'),
+                rete_iva=Decimal('0.00'),
                 estado='Aceptada'
             )
 
@@ -183,6 +207,12 @@ def restaurar_datos(apps, schema_editor):
                 subtotal=f_exito.subtotal,
                 iva=f_exito.iva,
                 total=f_exito.total,
+                otros_impuestos=Decimal('0.00'),
+                descuento_global=Decimal('0.00'),
+                recargo_global=Decimal('0.00'),
+                anticipos=Decimal('0.00'),
+                rete_fuente=Decimal('0.00'),
+                rete_iva=Decimal('0.00'),
                 estado='Aceptada'
             )
 

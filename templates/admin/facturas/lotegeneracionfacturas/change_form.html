@@ -1,6 +1,47 @@
 {% extends "admin/change_form.html" %}
 {% load i18n admin_urls %}
 
+{% block extrastyle %}
+    {{ block.super }}
+    <style>
+        /* High-contrast dark controls for Lote change form */
+        .form-row select,
+        .form-row select option,
+        .form-row input[type="text"],
+        .form-row input[type="number"],
+        .form-row input[type="date"],
+        .form-row input[type="time"],
+        .form-row input[type="file"],
+        .form-row textarea {
+            background-color: #0b1120 !important;
+            color: #f8fafc !important;
+            border: 1px solid #334155 !important;
+            border-radius: 6px !important;
+            padding: 8px 12px !important;
+            box-sizing: border-box !important;
+        }
+        .form-row select:focus,
+        .form-row input:focus,
+        .form-row textarea:focus {
+            border-color: #38bdf8 !important;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important;
+            outline: none !important;
+        }
+        .form-row select option {
+            background-color: #0b1120 !important;
+            color: #f8fafc !important;
+            padding: 6px 10px !important;
+        }
+        .field-productos_texto {
+            width: 100% !important;
+        }
+        .field-productos_texto .productos-editor-wrapper {
+            max-width: 100% !important;
+            width: 100% !important;
+        }
+    </style>
+{% endblock %}
+
 {% block object-tools-items %}
     {{ block.super }}
     {% if change and original %}
@@ -43,7 +84,7 @@
         wrapper.style.flexDirection = "column";
         wrapper.style.gap = "8px";
         wrapper.style.width = "100%";
-        wrapper.style.maxWidth = "880px";
+        wrapper.style.maxWidth = "100%";
         wrapper.style.boxSizing = "border-box";
         wrapper.style.marginTop = "4px";
 

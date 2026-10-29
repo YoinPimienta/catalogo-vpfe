@@ -5,41 +5,31 @@
 {{ block.super }}
 <link rel="stylesheet" type="text/css" href="{% static "admin/css/forms.css" %}" />
 <style>
-    /* Premium Modern UI for Bulk Generation Form */
+    /* Premium Modern Dark UI for Bulk Generation Form */
     .bulk-container {
-        max-width: 1000px;
+        max-width: 1100px;
         margin: 20px auto;
-        font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
     
     /* Base Invoice Card */
     .info-card {
-        background: linear-gradient(135deg, #1e3a47 0%, #102a36 100%);
-        color: #ffffff;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+        color: #ffffff !important;
         padding: 24px;
         border-radius: 12px;
-        margin-bottom: 30px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        margin-bottom: 25px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+        border: 1px solid #334155;
         position: relative;
         overflow: hidden;
     }
-    .info-card::after {
-        content: "";
-        position: absolute;
-        top: -50%;
-        right: -30%;
-        width: 300px;
-        height: 300px;
-        background: radial-gradient(circle, rgba(36, 128, 128, 0.2) 0%, transparent 70%);
-        pointer-events: none;
-    }
     .info-card h2 {
         margin-top: 0;
-        color: #24d2d2 !important;
-        font-size: 1.6rem;
+        color: #38bdf8 !important;
+        font-size: 1.4rem;
         font-weight: 700;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+        border-bottom: 1px solid #334155;
         padding-bottom: 12px;
         display: flex;
         align-items: center;
@@ -59,170 +49,208 @@
         font-size: 0.75rem;
         text-transform: uppercase;
         letter-spacing: 0.8px;
-        color: #8fa0a8;
+        color: #94a3b8;
         margin-bottom: 4px;
     }
     .info-value {
         font-size: 1.1rem;
         font-weight: 600;
+        color: #f8fafc;
     }
     .info-value.highlight {
-        color: #24d2d2;
+        color: #38bdf8;
     }
 
     /* Main Form Layout */
     .form-wrapper {
-        background: var(--body-bg, #ffffff);
-        border: 1px solid var(--border-color, #e0e0e0);
+        background: #0f172a !important;
+        border: 1px solid #1e293b !important;
         border-radius: 12px;
         padding: 30px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        color: #f8fafc;
     }
     
     .form-wrapper h3 {
         margin-top: 0;
         font-size: 1.3rem;
-        border-bottom: 1px solid var(--border-color, #eee);
-        padding-bottom: 10px;
-        margin-bottom: 20px;
-        color: var(--body-quiet-color, #444);
-    }
-
-    /* Beautiful preview table */
-    .preview-box {
-        background: #f7f9fa;
-        border: 1px dashed #cbd5e1;
-        border-radius: 8px;
-        padding: 20px;
-        margin-top: 25px;
-    }
-    [data-theme="dark"] .preview-box {
-        background: #1e293b;
-        border-color: #475569;
-    }
-    .preview-box h4 {
-        margin-top: 0;
-        font-size: 1.1rem;
-        color: #3b82f6;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-    }
-    .preview-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 10px;
-        font-size: 0.85rem;
-    }
-    .preview-table th, .preview-table td {
-        padding: 8px 12px;
-        text-align: left;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-    }
-    [data-theme="dark"] .preview-table th, [data-theme="dark"] .preview-table td {
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-    .preview-table th {
-        font-weight: bold;
-        color: var(--body-quiet-color, #666);
-    }
-
-    /* Custom form errors and styles */
-    .errornote-custom {
-        background-color: #fee2e2;
-        border: 1px solid #f87171;
-        color: #991b1b;
-        padding: 15px;
-        border-radius: 8px;
-        margin-bottom: 20px;
+        border-bottom: 1px solid #1e293b;
+        padding-bottom: 12px;
+        margin-bottom: 24px;
+        color: #f8fafc !important;
         font-weight: 600;
     }
-    [data-theme="dark"] .errornote-custom {
-        background-color: #7f1d1d;
-        border-color: #b91c1c;
-        color: #fca5a5;
+
+    .grid-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+    }
+
+    .form-group-fullwidth {
+        grid-column: 1 / -1 !important;
+        width: 100% !important;
     }
 
     .form-group-custom {
-        margin-bottom: 20px;
         display: flex;
         flex-direction: column;
         gap: 6px;
     }
     .form-group-custom label {
         font-weight: 600;
-        color: var(--body-loud-color, #333);
-        font-size: 0.9rem;
+        color: #cbd5e1 !important;
+        font-size: 0.88rem;
     }
-    .form-group-custom input, .form-group-custom select {
-        padding: 10px 14px;
-        border: 1px solid var(--border-color, #ccc);
+
+    /* Universal Dark Controls - High Contrast and Legibility */
+    .form-group-custom input,
+    .form-group-custom select,
+    select,
+    select option,
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    input[type="time"],
+    input[type="file"],
+    textarea {
+        background-color: #0b1120 !important;
+        color: #f8fafc !important;
+        border: 1px solid #334155 !important;
         border-radius: 6px;
-        font-size: 0.95rem;
-        background: var(--body-bg, #fff);
-        color: var(--body-color, #333);
+        padding: 10px 14px;
+        font-size: 0.92rem;
         transition: border-color 0.2s, box-shadow 0.2s;
         max-width: 100%;
         box-sizing: border-box;
     }
-    .form-group-custom input:focus, .form-group-custom select:focus {
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+
+    .form-group-custom select option,
+    select option {
+        background-color: #0b1120 !important;
+        color: #f8fafc !important;
+        padding: 8px 12px;
+    }
+
+    .form-group-custom input:focus,
+    .form-group-custom select:focus,
+    textarea:focus {
+        border-color: #38bdf8 !important;
+        box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important;
         outline: none;
     }
+
     .form-group-custom .help-text {
-        font-size: 0.8rem;
-        color: var(--body-quiet-color, #666);
+        font-size: 0.78rem;
+        color: #94a3b8 !important;
         margin-top: 4px;
+        line-height: 1.4;
     }
+
     .form-group-custom .error-list {
-        color: #dc2626;
+        color: #f87171;
         font-size: 0.8rem;
         margin: 4px 0 0 0;
         padding: 0;
         list-style: none;
     }
 
+    /* Beautiful Dark Preview Box */
+    .preview-box {
+        background: #0b1120 !important;
+        border: 1px solid #1e293b !important;
+        border-radius: 10px;
+        padding: 22px;
+        margin-top: 30px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    }
+    .preview-box h4 {
+        margin-top: 0;
+        font-size: 1.15rem;
+        color: #38bdf8 !important;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+    }
+    .preview-box p {
+        color: #94a3b8 !important;
+        font-size: 0.82rem;
+        margin: 0 0 14px 0;
+    }
+    .preview-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        font-size: 0.86rem;
+    }
+    .preview-table th {
+        background: #1e293b !important;
+        color: #94a3b8 !important;
+        font-weight: 600;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        padding: 10px 14px;
+        border-bottom: 2px solid #334155;
+    }
+    .preview-table td {
+        padding: 10px 14px;
+        text-align: left;
+        color: #cbd5e1 !important;
+        border-bottom: 1px solid #1e293b;
+    }
+    .preview-table tr:hover td {
+        background-color: rgba(56, 189, 248, 0.04);
+    }
+
+    /* Custom form errors and styles */
+    .errornote-custom {
+        background-color: #7f1d1d;
+        border: 1px solid #b91c1c;
+        color: #fca5a5;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        font-weight: 600;
+    }
+
+    /* Submit Row */
     .submit-row-custom {
         display: flex;
         justify-content: flex-end;
         gap: 15px;
         margin-top: 30px;
         padding-top: 20px;
-        border-top: 1px solid var(--border-color, #eee);
+        border-top: 1px solid #1e293b;
     }
     .btn {
-        padding: 12px 24px;
+        padding: 11px 22px;
         border-radius: 6px;
         font-weight: 600;
-        font-size: 0.95rem;
+        font-size: 0.92rem;
         cursor: pointer;
         text-decoration: none;
         transition: all 0.2s;
         border: none;
     }
     .btn-secondary {
-        background: #e2e8f0;
-        color: #475569;
+        background: #1e293b !important;
+        color: #cbd5e1 !important;
+        border: 1px solid #334155 !important;
     }
     .btn-secondary:hover {
-        background: #cbd5e1;
-    }
-    [data-theme="dark"] .btn-secondary {
-        background: #334155;
-        color: #cbd5e1;
-    }
-    [data-theme="dark"] .btn-secondary:hover {
-        background: #475569;
+        background: #334155 !important;
+        color: #ffffff !important;
     }
     .btn-primary {
-        background: #248080;
-        color: white;
-        box-shadow: 0 2px 4px rgba(36, 128, 128, 0.2);
+        background: #0284c7 !important;
+        color: #ffffff !important;
+        box-shadow: 0 2px 8px rgba(2, 132, 199, 0.4) !important;
     }
     .btn-primary:hover {
-        background: #1c6666;
-        box-shadow: 0 4px 6px rgba(36, 128, 128, 0.3);
+        background: #0369a1 !important;
+        box-shadow: 0 4px 12px rgba(2, 132, 199, 0.6) !important;
     }
 </style>
 {% endblock %}
@@ -274,9 +302,9 @@
         <form method="post" id="bulk-form" enctype="multipart/form-data" novalidate>
             {% csrf_token %}
             
-            <div class="grid-form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+            <div class="grid-form">
                 {% for field in form %}
-                    <div class="form-group-custom">
+                    <div class="form-group-custom field-{{ field.name }}{% if field.name == 'productos_texto' or field.name == 'factura_guia' %} form-group-fullwidth{% endif %}">
                         <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                         {{ field }}
                         {% if field.help_text %}
@@ -296,10 +324,10 @@
             <!-- Dynamic Interactive Sequence Preview Box -->
             <div class="preview-box">
                 <h4>Vista Previa de la Secuencia a Generar</h4>
-                <p style="margin: 0 0 10px 0; font-size: 0.8rem; color: var(--body-quiet-color, #666);">
+                <p>
                     Esta vista previa calcula dinámicamente cómo se distribuirán los folios y las fechas en tiempo real según tu configuración.
                 </p>
-                <div style="max-height: 250px; overflow-y: auto;">
+                <div style="max-height: 280px; overflow-y: auto;">
                     <table class="preview-table" id="preview-table">
                         <thead>
                             <tr>
@@ -312,7 +340,7 @@
                         </thead>
                         <tbody>
                             <tr>
-                                <td colspan="5" style="text-align: center; color: #888;">Introduce valores en el formulario para ver la vista previa.</td>
+                                <td colspan="5" style="text-align: center; color: #94a3b8; padding: 16px;">Introduce valores en el formulario para ver la vista previa.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -360,6 +388,7 @@
 
         // Folio increment helper matching python logic
         function incrementFolio(folioStr, increment) {
+            if (!folioStr) return String(increment || 1);
             const match = folioStr.match(/(\d+)$/);
             if (match) {
                 const digits = match[1];
@@ -376,7 +405,7 @@
             const fechaInicial = parseDate(fechaInicialInput.value);
             const facturasPorDia = parseInt(facturasPorDiaInput.value, 10) || 1;
             const incrementoFolio = parseInt(incrementoFolioInput.value, 10) || 1;
-            const comportamientoVencimiento = comportamientoVencimientoInput.value;
+            const comportamientoVencimiento = comportamientoVencimientoInput ? comportamientoVencimientoInput.value : 'plazo_relativo';
 
             // Calculate base date relative difference (plazo)
             let diffDays = 0;
@@ -398,7 +427,7 @@
             tbody.innerHTML = "";
 
             if (cantidad <= 0 || !fechaInicial) {
-                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #888;">Introduce valores válidos de cantidad y fecha inicial para previsualizar.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #94a3b8; padding: 16px;">Introduce valores válidos de cantidad y fecha inicial para previsualizar.</td></tr>`;
                 return;
             }
 
@@ -428,11 +457,11 @@
                 if (i < displayLimit) {
                     const row = document.createElement("tr");
                     row.innerHTML = `
-                        <td><strong>${i + 1}</strong></td>
-                        <td>${(serieInput && serieInput.value.trim()) ? serieInput.value.trim().toUpperCase() : baseSerie}</td>
-                        <td><span style="font-family: monospace; font-weight: 600; color: #1e3a47;">${currentFolio}</span></td>
-                        <td>${formatDate(currentEmission)}</td>
-                        <td>${formatDate(currentVencimiento)}</td>
+                        <td><strong style="color: #f8fafc;">${i + 1}</strong></td>
+                        <td><span style="color: #94a3b8; font-weight: 500;">${(serieInput && serieInput.value.trim()) ? serieInput.value.trim().toUpperCase() : baseSerie}</span></td>
+                        <td><span style="font-family: monospace; font-weight: 600; color: #38bdf8; background: rgba(56, 189, 248, 0.1); padding: 3px 8px; border-radius: 4px;">${currentFolio}</span></td>
+                        <td style="color: #e2e8f0;">${formatDate(currentEmission)}</td>
+                        <td style="color: #e2e8f0;">${formatDate(currentVencimiento)}</td>
                     `;
                     tbody.appendChild(row);
                 }
@@ -441,7 +470,7 @@
             if (cantidad > displayLimit) {
                 const footerRow = document.createElement("tr");
                 footerRow.innerHTML = `
-                    <td colspan="5" style="text-align: center; font-style: italic; background-color: rgba(0,0,0,0.02); color: var(--body-quiet-color, #666);">
+                    <td colspan="5" style="text-align: center; font-style: italic; background-color: rgba(255,255,255,0.02); color: #94a3b8; padding: 12px;">
                         ... y ${cantidad - displayLimit} facturas más en la secuencia consecutiva ...
                     </td>
                 `;
@@ -487,9 +516,9 @@
             const wrapper = document.createElement("div");
             wrapper.style.display = "flex";
             wrapper.style.flexDirection = "column";
-            wrapper.style.gap = "8px";
+            wrapper.style.gap = "10px";
             wrapper.style.width = "100%";
-            wrapper.style.marginTop = "4px";
+            wrapper.style.marginTop = "6px";
 
             prodTextarea.parentNode.insertBefore(wrapper, prodTextarea);
 
@@ -498,24 +527,36 @@
             toolbar.style.alignItems = "center";
             toolbar.style.justifyContent = "space-between";
             toolbar.style.flexWrap = "wrap";
-            toolbar.style.gap = "8px";
+            toolbar.style.gap = "10px";
 
             const btnGroup = document.createElement("div");
             btnGroup.style.display = "flex";
             btnGroup.style.gap = "8px";
+            btnGroup.style.flexWrap = "wrap";
 
             function makeBtn(text, clickHandler) {
                 const b = document.createElement("button");
                 b.type = "button";
                 b.textContent = text;
                 b.style.background = "#1e293b";
-                b.style.color = "#cbd5e1";
+                b.style.color = "#e2e8f0";
                 b.style.border = "1px solid #334155";
-                b.style.borderRadius = "4px";
-                b.style.padding = "4px 10px";
-                b.style.fontSize = "0.78rem";
+                b.style.borderRadius = "5px";
+                b.style.padding = "6px 14px";
+                b.style.fontSize = "0.8rem";
                 b.style.cursor = "pointer";
                 b.style.fontWeight = "500";
+                b.style.transition = "all 0.15s ease-in-out";
+                b.addEventListener("mouseenter", () => {
+                    b.style.background = "#334155";
+                    b.style.color = "#ffffff";
+                    b.style.borderColor = "#475569";
+                });
+                b.addEventListener("mouseleave", () => {
+                    b.style.background = "#1e293b";
+                    b.style.color = "#e2e8f0";
+                    b.style.borderColor = "#334155";
+                });
                 b.addEventListener("click", clickHandler);
                 return b;
             }
@@ -543,8 +584,8 @@
             btnGroup.appendChild(btnLimpiar);
 
             const formatHint = document.createElement("span");
-            formatHint.style.fontSize = "0.75rem";
-            formatHint.style.color = "#64748b";
+            formatHint.style.fontSize = "0.78rem";
+            formatHint.style.color = "#94a3b8";
             formatHint.textContent = "Formatos: Excel, Código | Nombre | Cant | Precio, o Nombre, Cant, Precio";
 
             toolbar.appendChild(btnGroup);
@@ -553,21 +594,21 @@
             prodTextarea.style.width = "100%";
             prodTextarea.style.boxSizing = "border-box";
             prodTextarea.style.fontFamily = "'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace";
-            prodTextarea.style.fontSize = "0.85rem";
+            prodTextarea.style.fontSize = "0.86rem";
             prodTextarea.style.lineHeight = "1.5";
-            prodTextarea.rows = 4;
-            prodTextarea.style.background = "#0f172a";
-            prodTextarea.style.color = "#f1f5f9";
+            prodTextarea.rows = 5;
+            prodTextarea.style.background = "#090d16";
+            prodTextarea.style.color = "#38bdf8";
             prodTextarea.style.border = "1px solid #334155";
             prodTextarea.style.borderRadius = "6px";
-            prodTextarea.style.padding = "8px 12px";
+            prodTextarea.style.padding = "10px 14px";
 
             const summaryCard = document.createElement("div");
-            summaryCard.style.background = "#0f172a";
+            summaryCard.style.background = "#090d16";
             summaryCard.style.border = "1px solid #1e293b";
             summaryCard.style.borderRadius = "6px";
-            summaryCard.style.padding = "10px 16px";
-            summaryCard.style.fontSize = "0.82rem";
+            summaryCard.style.padding = "12px 18px";
+            summaryCard.style.fontSize = "0.84rem";
             summaryCard.style.color = "#94a3b8";
             summaryCard.style.boxSizing = "border-box";
             summaryCard.style.display = "none";
@@ -664,14 +705,14 @@
                     const iva = totalCompra - subtotal;
                     summaryCard.style.display = "block";
                     summaryCard.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                            <span style="color: #cbd5e1; font-weight: 500;">
-                                <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #38bdf8; margin-right: 6px; vertical-align: middle;"></span>
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+                            <span style="color: #e2e8f0; font-weight: 500;">
+                                <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #10b981; margin-right: 6px; vertical-align: middle;"></span>
                                 ${itemsDetectados} producto(s) reconocido(s)
                             </span>
-                            <span>Subtotal: <strong style="color: #f1f5f9; font-family: monospace;">$${fmtMiles(subtotal)}</strong></span>
-                            <span>IVA 19%: <strong style="color: #f1f5f9; font-family: monospace;">$${fmtMiles(iva)}</strong></span>
-                            <span style="color: #38bdf8; font-weight: 600; font-size: 0.92rem; font-family: monospace;">Total Factura: $${fmtMiles(totalCompra)} COP</span>
+                            <span>Subtotal: <strong style="color: #f8fafc; font-family: monospace;">$${fmtMiles(subtotal)}</strong></span>
+                            <span>IVA 19%: <strong style="color: #f8fafc; font-family: monospace;">$${fmtMiles(iva)}</strong></span>
+                            <span style="color: #38bdf8; font-weight: 700; font-size: 0.95rem; font-family: monospace;">Total Factura: $${fmtMiles(totalCompra)} COP</span>
                         </div>
                     `;
                 } else {

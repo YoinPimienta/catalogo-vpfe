@@ -392,11 +392,14 @@ class Producto(models.Model):
         iva = sum(p.monto_iva for p in productos)
         inc = sum(p.monto_inc for p in productos)
         
-        # Totales auto-calculados
+        # Totales auto-calculados de forma 100% segura frente a None
+        otros_imp = getattr(factura, 'otros_impuestos', Decimal('0')) or Decimal('0')
+        desc_glob = getattr(factura, 'descuento_global', Decimal('0')) or Decimal('0')
+        rec_glob = getattr(factura, 'recargo_global', Decimal('0')) or Decimal('0')
         total_bruto = subtotal
-        total_impuesto = iva + inc + factura.otros_impuestos
+        total_impuesto = iva + inc + otros_imp
         total_neto = total_bruto - descuento_detalle + total_impuesto
-        total = total_neto - factura.descuento_global + factura.recargo_global
+        total = total_neto - desc_glob + rec_glob
         
         Factura.objects.filter(pk=factura.pk).update(
             subtotal=total_bruto,

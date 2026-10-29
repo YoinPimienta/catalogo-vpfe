@@ -48,12 +48,14 @@ class GenerarFacturasMasivasForm(forms.Form):
         help_text="Opcional. Límite de fecha. Si la secuencia la supera, la generación se detendrá preventivamente."
     )
     hora_inicial = forms.TimeField(
+        required=False,
         initial="08:00",
         label="Hora Inicial (Rango Comercial)",
         widget=forms.TimeInput(attrs={'type': 'time', 'style': 'max-width: 250px;'}),
         help_text="Hora de inicio para distribuir las ventas durante el día."
     )
     hora_final = forms.TimeField(
+        required=False,
         initial="20:00",
         label="Hora Final (Rango Comercial)",
         widget=forms.TimeInput(attrs={'type': 'time', 'style': 'max-width: 250px;'}),
@@ -65,11 +67,6 @@ class GenerarFacturasMasivasForm(forms.Form):
         label="Nombre del Cajero / Operador",
         widget=forms.TextInput(attrs={'placeholder': 'Ej: ZAPATA MICHAELL', 'style': 'max-width: 250px;'}),
         help_text="Opcional. Nombre del operador que aparece en la tirilla."
-    )
-    factura_guia = forms.FileField(
-        required=False,
-        label="Adjuntar Factura Guía (.docx)",
-        help_text="Opcional. Si adjuntas un archivo Word muestra, el sistema editará directamente sobre él respetando 100% el diseño original."
     )
     facturas_por_dia = forms.IntegerField(
         min_value=1,
@@ -92,16 +89,6 @@ class GenerarFacturasMasivasForm(forms.Form):
         widget=forms.TextInput(attrs={'placeholder': 'Ej: 1, 7, 9 o 6-15', 'style': 'max-width: 250px;'}),
         help_text="Incremento entre cada factura. Ej: 1 (normal), 7 (de 7 en 7), 9 (de 9 en 9), 15 (de 15 en 15), o rango como 6-15."
     )
-    productos_texto = forms.CharField(
-        widget=forms.Textarea(attrs={
-            'rows': 4,
-            'placeholder': 'Opcional: Pega productos aquí (uno por línea).\nEjemplos:\n3100827 | Nevera DOOR COOLING LG | 1 | 3365000\n3110648 | Nevecón SAMSUNG | 1 | 5500267\nO copia y pega desde Excel con columnas: Nombre, Cantidad, Precio',
-            'style': 'width: 100%; max-width: 650px; font-family: monospace; font-size: 0.85rem;'
-        }),
-        required=False,
-        label="Pegar / Editor Rápido de Productos",
-        help_text="Pega la lista de productos a incluir en las facturas generadas. Si se deja vacío, tomará los de la base."
-    )
     comportamiento_vencimiento = forms.ChoiceField(
         choices=[
             ('plazo_relativo', 'Mantener plazo relativo (plazo en días de la factura base)'),
@@ -111,6 +98,21 @@ class GenerarFacturasMasivasForm(forms.Form):
         initial='plazo_relativo',
         label="Comportamiento del Vencimiento",
         help_text="Cómo calcular la fecha de vencimiento respecto a la de emisión."
+    )
+    factura_guia = forms.FileField(
+        required=False,
+        label="Adjuntar Factura Guía (.docx)",
+        help_text="Opcional. Si adjuntas un archivo Word muestra, el sistema editará directamente sobre él respetando 100% el diseño original."
+    )
+    productos_texto = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'rows': 4,
+            'placeholder': 'Opcional: Pega productos aquí (uno por línea).\nEjemplos:\n3100827 | Nevera DOOR COOLING LG | 1 | 3365000\n3110648 | Nevecón SAMSUNG | 1 | 5500267\nO copia y pega desde Excel con columnas: Nombre, Cantidad, Precio',
+            'style': 'width: 100%; font-family: monospace; font-size: 0.85rem;'
+        }),
+        required=False,
+        label="Pegar / Editor Rápido de Productos",
+        help_text="Pega la lista de productos a incluir en las facturas generadas. Si se deja vacío, tomará los de la base."
     )
 
 # Función auxiliar robusta para incrementar folios alfanuméricos manteniendo ceros a la izquierda
@@ -135,14 +137,18 @@ def parse_salto_folio(salto_val):
         return 1
 
 def increment_folio(folio_str, increment=1):
+    if not folio_str:
+        return str(increment or 1)
+    folio_str = str(folio_str).strip()
     match = re.search(r'(\d+)$', folio_str)
     if match:
         digits = match.group(1)
-        num = int(digits) + increment
+        step = int(increment or 1)
+        num = int(digits) + step
         new_digits = f"{num:0{len(digits)}d}"
         return folio_str[:match.start()] + new_digits
     else:
-        return f"{folio_str}_{increment}"
+        return f"{folio_str}_{increment or 1}"
 
 # Comparador estricto para detectar si una factura generada sufrió modificaciones manuales respecto a la base
 def tiene_cambios_respecto_a_base(factura, factura_base):
@@ -340,14 +346,17 @@ def ejecutar_generacion_masiva_para_lote(lote, usuario=None, cajero_custom=None,
             vigencia=factura_base.vigencia,
             fecha_validacion_dian=factura_base.fecha_validacion_dian,
             
-            estado=factura_base.estado,
-            moneda=factura_base.moneda,
-            otros_impuestos=factura_base.otros_impuestos,
-            descuento_global=factura_base.descuento_global,
-            recargo_global=factura_base.recargo_global,
-            anticipos=factura_base.anticipos,
-            rete_fuente=factura_base.rete_fuente,
-            rete_iva=factura_base.rete_iva,
+            estado=getattr(factura_base, 'estado', 'Aceptada') or 'Aceptada',
+            moneda=getattr(factura_base, 'moneda', 'COP') or 'COP',
+            subtotal=getattr(factura_base, 'subtotal', Decimal('0')) or Decimal('0'),
+            iva=getattr(factura_base, 'iva', Decimal('0')) or Decimal('0'),
+            total=getattr(factura_base, 'total', Decimal('0')) or Decimal('0'),
+            otros_impuestos=getattr(factura_base, 'otros_impuestos', Decimal('0')) or Decimal('0'),
+            descuento_global=getattr(factura_base, 'descuento_global', Decimal('0')) or Decimal('0'),
+            recargo_global=getattr(factura_base, 'recargo_global', Decimal('0')) or Decimal('0'),
+            anticipos=getattr(factura_base, 'anticipos', Decimal('0')) or Decimal('0'),
+            rete_fuente=getattr(factura_base, 'rete_fuente', Decimal('0')) or Decimal('0'),
+            rete_iva=getattr(factura_base, 'rete_iva', Decimal('0')) or Decimal('0'),
         )
         copia_factura.save()
 
@@ -830,18 +839,27 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
             super().save_model(request, obj, form, change)
 
             if obj.factura_base and obj.cantidad_generada > 0:
-                with transaction.atomic():
-                    facturas_creadas = ejecutar_generacion_masiva_para_lote(
-                        lote=obj, 
-                        usuario=request.user,
-                        serie_custom=obj.serie,
-                        folio_inicial=obj.folio_inicial,
-                        incremento_folio_val=obj.salto_folio,
-                        productos_texto=obj.productos_texto
-                    )
-                    messages.success(
+                try:
+                    with transaction.atomic():
+                        facturas_creadas = ejecutar_generacion_masiva_para_lote(
+                            lote=obj, 
+                            usuario=request.user,
+                            serie_custom=obj.serie,
+                            folio_inicial=obj.folio_inicial,
+                            incremento_folio_val=obj.salto_folio,
+                            productos_texto=obj.productos_texto
+                        )
+                        messages.success(
+                            request,
+                            f"Lote #{obj.id} ({obj.plantilla}) generado con éxito. Se crearon {len(facturas_creadas)} facturas."
+                        )
+                except Exception as e:
+                    import traceback
+                    tb = traceback.format_exc()
+                    print(f"Error generando facturas para el lote #{obj.id}: {e}\n{tb}")
+                    messages.error(
                         request,
-                        f"Lote #{obj.id} ({obj.plantilla}) generado con éxito. Se crearon {len(facturas_creadas)} facturas."
+                        f"El lote fue guardado pero ocurrió un error al generar las facturas: {str(e)}"
                     )
         else:
             super().save_model(request, obj, form, change)
