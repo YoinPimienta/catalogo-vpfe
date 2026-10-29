@@ -529,7 +529,15 @@ class FacturaAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Identificación del Documento', {
-            'fields': ('cufe', 'descargar_word', 'estado', 'serie', 'folio', 'fecha_emision', 'fecha_vencimiento', 'tipo_operacion', 'forma_pago', 'orden_pedido', 'fecha_orden_pedido')
+            'fields': (
+                ('plantilla', 'estado'),
+                'cufe',
+                'descargar_word',
+                ('serie', 'folio'),
+                ('fecha_emision', 'fecha_vencimiento'),
+                ('tipo_operacion', 'forma_pago'),
+                ('orden_pedido', 'fecha_orden_pedido'),
+            )
         }),
         ('Datos del Emisor', {
             'fields': ('emisor_nombre', 'emisor_nit', 'emisor_tipo_contribuyente', 'emisor_regimen_fiscal', 'emisor_responsabilidad_tributaria', 'emisor_pais', 'emisor_departamento', 'emisor_municipio', 'emisor_direccion', 'emisor_telefono', 'emisor_correo')

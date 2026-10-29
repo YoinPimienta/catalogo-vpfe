@@ -124,6 +124,15 @@ class Factura(models.Model):
     descargas = models.IntegerField(default=0, help_text="Contador de descargas de PDF o Word para auditoría de actividad.")
 
     def save(self, *args, **kwargs):
+        # Auto-sincronizar plantilla según datos del emisor si quedó en JUMBO por default
+        if self.emisor_nombre:
+            em_norm = self.emisor_nombre.upper()
+            nit_norm = (self.emisor_nit or '').replace('.', '').replace('-', '').strip()
+            if ('EXITO' in em_norm or 'ÉXITO' in em_norm or '890900608' in nit_norm) and self.plantilla == 'JUMBO':
+                self.plantilla = 'EXITO'
+            elif ('CENCOSUD' in em_norm or 'JUMBO' in em_norm or '900155107' in nit_norm) and self.plantilla == 'EXITO':
+                self.plantilla = 'JUMBO'
+
         if not self.hora_emision:
             self.hora_emision = obtener_hora_actual_colombia()
         if not self.fecha_emision:

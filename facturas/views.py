@@ -118,6 +118,13 @@ def previsualizar_tirilla(request, cufe):
 
     doc = generar_documento_factura(factura)
     plantilla = (factura.plantilla or 'JUMBO').upper()
+    emisor_raw = (getattr(factura, 'emisor_nombre', '') or '').upper()
+    nit_raw = (getattr(factura, 'emisor_nit', '') or '').replace('.', '').replace('-', '').strip()
+    if plantilla == 'JUMBO' and ('EXITO' in emisor_raw or 'ÉXITO' in emisor_raw or '890900608' in nit_raw):
+        plantilla = 'EXITO'
+    elif plantilla == 'EXITO' and ('CENCOSUD' in emisor_raw or 'JUMBO' in emisor_raw or '900155107' in nit_raw):
+        plantilla = 'JUMBO'
+
     qr_rid = 'rId6' if plantilla == 'EXITO' else 'rId8'
     bc_rid = 'rId7' if plantilla == 'EXITO' else 'rId9'
 
@@ -268,6 +275,7 @@ def buscar_datos_emisor(request):
         factura = Factura.objects.filter(emisor_nombre__icontains=emisor_nombre).order_by('-id').first()
         if factura:
             data = {
+                'plantilla': factura.plantilla,
                 'emisor_nit': factura.emisor_nit,
                 'emisor_tipo_contribuyente': factura.emisor_tipo_contribuyente,
                 'emisor_regimen_fiscal': factura.emisor_regimen_fiscal,

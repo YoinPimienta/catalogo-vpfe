@@ -131,8 +131,13 @@
 
         .receipt-media img.barcode-img {
             max-width: 270px;
-            height: 44px;
+            width: auto;
+            height: auto;
+            max-height: 52px;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
             image-rendering: pixelated;
+            display: inline-block;
         }
 
         @media print {

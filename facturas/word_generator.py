@@ -50,8 +50,15 @@ def resolver_plantilla_factura(factura):
 
     plantillas_dir = os.path.join(settings.BASE_DIR, 'plantillas_base')
 
-    # Chequear campo plantilla explicito
+    # Chequear campo plantilla explicito con validación inteligente frente al emisor
     plantilla_val = getattr(factura, 'plantilla', None)
+    emisor_raw = (getattr(factura, 'emisor_nombre', '') or '').upper()
+    nit_raw = (getattr(factura, 'emisor_nit', '') or '').replace('.', '').replace('-', '').strip()
+    if plantilla_val == 'JUMBO' and ('EXITO' in emisor_raw or 'ÉXITO' in emisor_raw or '890900608' in nit_raw):
+        plantilla_val = 'EXITO'
+    elif plantilla_val == 'EXITO' and ('CENCOSUD' in emisor_raw or 'JUMBO' in emisor_raw or '900155107' in nit_raw):
+        plantilla_val = 'JUMBO'
+
     if plantilla_val:
         p = os.path.join(plantillas_dir, f"{str(plantilla_val).upper().strip()}.docx")
         if os.path.exists(p):
@@ -550,10 +557,8 @@ def rellenar_plantilla_exito(doc_path, factura):
     if 'rId6' in doc.part.rels:
         doc.part.rels['rId6'].target_part._blob = qr_bytes
 
-    bc_stream = generar_barcode_stream(numero_factura)
-    bc_bytes = bc_stream.getvalue()
-    if 'rId7' in doc.part.rels:
-        doc.part.rels['rId7'].target_part._blob = bc_bytes
+    # Se preserva exactamente el código de barras original de la plantilla de Éxito según requerimiento
+    pass
 
     # Reemplazo en párrafos buscando por contenido exacto para máxima fidelidad con el espaciado
     for idx, p in enumerate(doc.paragraphs):
@@ -1114,6 +1119,12 @@ def generar_documento_factura(factura, template_path=None):
 
     filename_lower = os.path.basename(tpl_path).lower()
     plantilla_tipo = getattr(factura, 'plantilla', '').upper()
+    emisor_raw = (getattr(factura, 'emisor_nombre', '') or '').upper()
+    nit_raw = (getattr(factura, 'emisor_nit', '') or '').replace('.', '').replace('-', '').strip()
+    if plantilla_tipo == 'JUMBO' and ('EXITO' in emisor_raw or 'ÉXITO' in emisor_raw or '890900608' in nit_raw):
+        plantilla_tipo = 'EXITO'
+    elif plantilla_tipo == 'EXITO' and ('CENCOSUD' in emisor_raw or 'JUMBO' in emisor_raw or '900155107' in nit_raw):
+        plantilla_tipo = 'JUMBO'
 
     # 1. Si el lote tiene plantilla personalizada subida por el usuario (factura_guia):
     if factura.lote_generacion and factura.lote_generacion.factura_guia and os.path.exists(factura.lote_generacion.factura_guia.path):
