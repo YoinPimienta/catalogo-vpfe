@@ -117,7 +117,7 @@ class Factura(models.Model):
         'LoteGeneracionFacturas',
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         related_name='facturas',
         help_text="Lote de generación masiva al que pertenece esta factura."
     )
