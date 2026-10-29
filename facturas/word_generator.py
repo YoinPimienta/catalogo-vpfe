@@ -1,3 +1,4 @@
+import jinja2
 from PIL import Image
 import os
 import io
@@ -800,6 +801,281 @@ def rellenar_factura_guia_estatica(doc_path, factura):
     limpiar_resaltados(doc)
     return doc
 
+class FormattedNumber(float):
+    """
+    Permite que los valores numericos se comporten como float/int para comparaciones en Jinja
+    ({% if iva > 0 %}, {% if inc_total > 0 %}) y se impriman con formato de moneda/miles al interpolar ({{ iva }}).
+    """
+    def __new__(cls, val, fmt_str=None):
+        try:
+            f = float(val or 0)
+        except Exception:
+            f = 0.0
+        obj = super().__new__(cls, f)
+        obj.fmt_str = fmt_str
+        return obj
+
+    def __str__(self):
+        if self.fmt_str:
+            return self.fmt_str
+        if self.is_integer():
+            return f"{int(self):,}".replace(',', '.')
+        return f"{self:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+    def __format__(self, format_spec):
+        return str(self)
+
+
+class AutoSafeUndefined(jinja2.Undefined):
+    """
+    Evita cualquier excepcion por variables no definidas en plantillas Jinja/DocxTemplate.
+    Soporta comparaciones seguras (> 0, < 0, ==), iteraciones vacias y strings vacios.
+    """
+    def _fail_with_undefined_error(self, *args, **kwargs):
+        return ''
+    def __str__(self):
+        return ''
+    def __html__(self):
+        return ''
+    def __bool__(self):
+        return False
+    def __iter__(self):
+        return iter([])
+    def __int__(self):
+        return 0
+    def __float__(self):
+        return 0.0
+    def __eq__(self, other):
+        return False
+    def __ne__(self, other):
+        return True
+    def __gt__(self, other):
+        return False
+    def __lt__(self, other):
+        return False
+    def __ge__(self, other):
+        return False
+    def __le__(self, other):
+        return False
+    def __getitem__(self, key):
+        return self
+    def __getattr__(self, name):
+        return self
+    def __call__(self, *args, **kwargs):
+        return self
+
+
+def construir_contexto_factura(factura, docxtpl_obj=None):
+    base_url = os.environ.get('APP_DOMAIN') or os.environ.get('RENDER_EXTERNAL_URL') or 'https://catalogo-vpfe1.onrender.com'
+    base_url = base_url.rstrip('/')
+    qr_url = f"{base_url}/?cufe={factura.cufe}"
+
+    qr_image = None
+    bc_image = None
+    if docxtpl_obj:
+        try:
+            qr_stream = generar_qr_stream(qr_url)
+            qr_image = InlineImage(docxtpl_obj, qr_stream, width=Mm(35))
+        except Exception:
+            qr_image = ""
+        try:
+            num_factura = f"{factura.serie or ''}{factura.folio or ''}".strip()
+            bc_stream = generar_barcode_stream(num_factura)
+            bc_image = InlineImage(docxtpl_obj, bc_stream, width=Mm(45))
+        except Exception:
+            bc_image = ""
+
+    # Preparar productos
+    productos_list = []
+    tot_cant = 0
+    prods = factura.productos.all() if factura.pk else []
+    for p in prods:
+        c = p.cantidad or 1
+        tot_cant += c
+        pu = p.valor_unitario or Decimal('0')
+        puv = getattr(p, 'precio_unitario_venta', None) or pu
+        tl = p.total_linea or (c * pu)
+        productos_list.append({
+            'codigo': p.codigo or '',
+            'nombre': p.nombre or '',
+            'descripcion': getattr(p, 'descripcion', '') or p.nombre or '',
+            'observacion': getattr(p, 'observacion', '') or '',
+            'cantidad': FormattedNumber(c, str(int(c) if float(c).is_integer() else c)),
+            'valor_unitario': FormattedNumber(pu, fmt_pesos(pu, separador_miles=".")),
+            'precio_unitario': FormattedNumber(pu, fmt_pesos(pu, separador_miles=".")),
+            'precio_unitario_venta': FormattedNumber(puv, fmt_pesos(puv, separador_miles=".")),
+            'descuento': FormattedNumber(p.descuento or 0, fmt_pesos(p.descuento or 0, separador_miles=".")),
+            'total_linea': FormattedNumber(tl, fmt_pesos(tl, separador_miles=".")),
+            'total': FormattedNumber(tl, fmt_pesos(tl, separador_miles=".")),
+            'tipo_iva': '19%',
+        })
+
+    subtotal_val = factura.subtotal or factura.total or Decimal('0')
+    iva_val = factura.iva or Decimal('0')
+    inc_val = getattr(factura, 'inc_total', None) or Decimal('0')
+    total_val = factura.total or Decimal('0')
+    desc_val = getattr(factura, 'descuento_detalle_total', None) or Decimal('0')
+    tot_imp = getattr(factura, 'total_impuesto', None) or (iva_val + inc_val)
+
+    fecha_emision_str = factura.fecha_emision.strftime('%d/%m/%Y') if factura.fecha_emision else ''
+    fecha_emision_iso = factura.fecha_emision.strftime('%Y-%m-%d') if factura.fecha_emision else ''
+    hora_emision_str = factura.hora_emision.strftime('%H:%M:%S') if factura.hora_emision else ''
+    fecha_venc_str = factura.fecha_vencimiento.strftime('%d/%m/%Y') if factura.fecha_vencimiento else ''
+    fecha_compact = factura.fecha_emision.strftime('%Y%m%d') if factura.fecha_emision else ''
+
+    tr = getattr(factura, 'transaccion', '0197') or '0197'
+    term = getattr(factura, 'terminal', '1034') or '1034'
+    reg = getattr(factura, 'registro', '05') or '05'
+    cajero = getattr(factura, 'cajero', 'CAJERO 01') or 'CAJERO 01'
+
+    iva_items = [{
+        'tipo': 'IVA',
+        'tarifa': '19%',
+        'compra': fmt_pesos(total_val, separador_miles="."),
+        'base': fmt_pesos(subtotal_val, separador_miles="."),
+        'impuesto': fmt_pesos(iva_val, separador_miles=".")
+    }]
+
+    context = {
+        # Identificacion
+        'serie': factura.serie or '',
+        'folio': factura.folio or '',
+        'numero': f"{factura.serie or ''}{factura.folio or ''}".strip(),
+        'numero_factura': f"{factura.serie or ''}{factura.folio or ''}".strip(),
+        'cufe': factura.cufe or '',
+        'cufe_linea_1': factura.cufe[:32] if factura.cufe else '',
+        'cufe_linea_2': factura.cufe[32:64] if factura.cufe and len(factura.cufe) >= 64 else '',
+        'cufe_linea_3': factura.cufe[64:] if factura.cufe and len(factura.cufe) > 64 else '',
+
+        # Fechas y Horas
+        'fecha_emision': fecha_emision_str,
+        'fecha_emision_iso': fecha_emision_iso,
+        'fecha_vencimiento': fecha_venc_str,
+        'hora_emision': hora_emision_str,
+        'fecha_hora': f"{fecha_emision_iso} {hora_emision_str}",
+        'fecha_expedicion_corta': fecha_emision_str,
+        'fecha_hora_operacion': f"{fecha_emision_iso} {hora_emision_str}",
+        'fecha_proceso': fecha_emision_str,
+        'hora_proceso': hora_emision_str,
+        'fecha_puntos': fecha_emision_str,
+
+        # Emisor
+        'emisor_nombre': factura.emisor_nombre or '',
+        'emisor_nit': factura.emisor_nit or '',
+        'emisor_direccion': factura.emisor_direccion or '',
+        'emisor_telefono': factura.emisor_telefono or '',
+        'emisor_correo': factura.emisor_correo or '',
+        'almacen': getattr(factura, 'terminal', 'PRINCIPAL') or 'PRINCIPAL',
+        'nombre_tienda': factura.emisor_nombre or '',
+        'sede_linea': factura.emisor_direccion or '',
+
+        # Receptor
+        'receptor_nombre': factura.receptor_nombre or '',
+        'receptor_nit': factura.receptor_nit or '',
+        'receptor_nit_padded': str(factura.receptor_nit or '').rjust(13, '0'),
+        'receptor_direccion': factura.receptor_direccion or '',
+        'receptor_telefono': factura.receptor_telefono or '',
+        'receptor_correo': factura.receptor_correo or '',
+        'receptor_email': factura.receptor_correo or '',
+
+        # Operacion y Caja
+        'forma_pago': factura.forma_pago or 'CONTADO',
+        'forma_pago_mayus': (factura.forma_pago or 'CONTADO').upper(),
+        'medio_pago': factura.medio_pago or 'EFECTIVO',
+        'cajero': cajero,
+        'cajero_id': cajero[:10] if cajero else '01',
+        'terminal': term,
+        'registro': reg,
+        'transaccion': tr,
+        'maquina': term,
+        'caja': term,
+        'caja_registro': reg,
+        'pedido': getattr(factura, 'orden_pedido', '1') or '1',
+        'tipo_venta': 'VENTA EN LINEA',
+        'tirilla_id': f"{fecha_compact}-{tr}",
+        'software_pos': 'VPFE POS 3.0',
+        'ciiu': '4711',
+        'proveedor_factura': 'CADENA S.A.',
+
+        # Totales numericos formateados y comparables
+        'subtotal': FormattedNumber(subtotal_val, fmt_pesos(subtotal_val, separador_miles=".")),
+        'subtotal_total_fmt': fmt_pesos(subtotal_val, separador_miles="."),
+        'base_total_fmt': fmt_pesos(subtotal_val, separador_miles="."),
+        'total': FormattedNumber(total_val, fmt_pesos(total_val, separador_miles=".")),
+        'total_fmt': fmt_pesos(total_val, separador_miles="."),
+        'compra_total_fmt': fmt_pesos(total_val, separador_miles="."),
+        'iva': FormattedNumber(iva_val, fmt_pesos(iva_val, separador_miles=".")),
+        'inc_total': FormattedNumber(inc_val, fmt_pesos(inc_val, separador_miles=".")),
+        'inc_porcentaje': 8,
+        'total_impuesto': FormattedNumber(tot_imp, fmt_pesos(tot_imp, separador_miles=".")),
+        'impuesto_total_fmt': fmt_pesos(tot_imp, separador_miles="."),
+        'impuesto_linea': fmt_pesos(tot_imp, separador_miles="."),
+        'descuento_total': FormattedNumber(desc_val, fmt_pesos(desc_val, separador_miles=".")),
+        'total_ahorros': '0',
+        'ahorro_fmt': '0',
+        'cambio': FormattedNumber(0, '0'),
+        'cambio_fmt': '0',
+        'pago_recibido': fmt_pesos(total_val, separador_miles="."),
+        'pago_fmt': fmt_pesos(total_val, separador_miles="."),
+        'puntos_cmr': '0',
+        'puntos_total': '0',
+        'total_articulos': len(productos_list),
+        'total_lineas': len(productos_list),
+        'total_lineas_un': tot_cant,
+
+        # DIAN y Legales
+        'numero_autorizacion': factura.numero_autorizacion or '',
+        'rango_desde': factura.rango_desde or '',
+        'rango_hasta': factura.rango_hasta or '',
+        'vigencia': factura.vigencia or '',
+        'vigencia_larga': factura.vigencia or '',
+        'fecha_resolucion_larga': 'RESOLUCION DIAN VIGENTE',
+        'resolucion_dian': factura.numero_autorizacion or '18764000001',
+        'resolucion_gc': 'GRAN CONTRIBUYENTE',
+        'xml_generado_por': factura.xml_generado_por or 'DIAN',
+        'notas_legales': getattr(factura, 'texto_legal', '') or '',
+        'notas_finales': getattr(factura, 'notas_finales', '') or '',
+        'firma_linea': '========================================',
+        'url_privacidad': 'https://www.dian.gov.co',
+
+        # Listas de Productos e Impuestos
+        'productos': productos_list,
+        'iva_item': iva_items,
+
+        # Elementos Graficos
+        'qr': qr_image or '',
+        'barcode': bc_image or '',
+    }
+    return context
+
+
+def render_jinja_documento(tpl_path, factura):
+    """
+    Renderiza de forma 100% segura cualquier plantilla con sintaxis Jinja (docxtpl)
+    sin fallos por variables faltantes o comparaciones numericas.
+    """
+    try:
+        docxtpl_obj = DocxTemplate(tpl_path)
+        context = construir_contexto_factura(factura, docxtpl_obj)
+        jinja_env = jinja2.Environment(undefined=AutoSafeUndefined)
+        docxtpl_obj.render(context, jinja_env=jinja_env)
+        out_stream = io.BytesIO()
+        docxtpl_obj.save(out_stream)
+        out_stream.seek(0)
+        doc = docx.Document(out_stream)
+        limpiar_resaltados(doc)
+        return doc
+    except Exception as e:
+        print(f"Aviso en render_jinja_documento: {e}. Usando relleno estatico de contingencia.")
+        try:
+            return rellenar_factura_guia_estatica(tpl_path, factura)
+        except Exception as e2:
+            print(f"Error en contingencia estatica: {e2}")
+            doc = docx.Document(tpl_path)
+            limpiar_resaltados(doc)
+            return doc
+
+
 def plantilla_tiene_jinja(doc_path):
     try:
         doc = docx.Document(doc_path)
@@ -818,68 +1094,38 @@ def plantilla_tiene_jinja(doc_path):
 def generar_documento_factura(factura, template_path=None):
     """
     Genera y retorna un docx.Document listo para una factura individual.
-    Selecciona automáticamente el motor de relleno según la plantilla elegida.
+    Selecciona automaticamente el motor de relleno segun la plantilla elegida.
     """
     tpl_path = template_path or resolver_plantilla_factura(factura)
     if not tpl_path or not os.path.exists(tpl_path):
-        raise FileNotFoundError(f"No se encontró la plantilla para la factura {factura.serie}{factura.folio}")
+        raise FileNotFoundError(f"No se encontro la plantilla para la factura {factura.serie}{factura.folio}")
 
     filename_lower = os.path.basename(tpl_path).lower()
     plantilla_tipo = getattr(factura, 'plantilla', '').upper()
 
-    # Si el lote tiene plantilla personalizada subida por el usuario (factura_guia) o plantilla == 'OTRA':
+    # 1. Si el lote tiene plantilla personalizada subida por el usuario (factura_guia):
     if factura.lote_generacion and factura.lote_generacion.factura_guia and os.path.exists(factura.lote_generacion.factura_guia.path):
         if plantilla_tiene_jinja(tpl_path):
-            docxtpl_obj = DocxTemplate(tpl_path)
-            context = {
-                'serie': factura.serie,
-                'folio': factura.folio,
-                'cufe': factura.cufe,
-                'fecha_emision': factura.fecha_emision.strftime('%d/%m/%Y') if factura.fecha_emision else '',
-                'hora_emision': factura.hora_emision.strftime('%H:%M:%S') if factura.hora_emision else '',
-                'total': fmt_pesos(factura.total),
-                'subtotal': fmt_pesos(factura.subtotal or factura.total),
-                'iva': fmt_pesos(factura.iva),
-                'emisor_nombre': factura.emisor_nombre,
-                'emisor_nit': factura.emisor_nit,
-                'receptor_nombre': factura.receptor_nombre,
-                'receptor_nit': factura.receptor_nit,
-            }
-            docxtpl_obj.render(context)
-            out_stream = io.BytesIO()
-            docxtpl_obj.save(out_stream)
-            out_stream.seek(0)
-            doc = docx.Document(out_stream)
-            limpiar_resaltados(doc)
-            return doc
+            return render_jinja_documento(tpl_path, factura)
         else:
             return rellenar_factura_guia_estatica(tpl_path, factura)
 
+    # 2. Plantilla JUMBO
     if plantilla_tipo == 'JUMBO' or 'jumbo' in filename_lower:
         return rellenar_plantilla_jumbo(tpl_path, factura)
+
+    # 3. Plantilla EXITO
     elif plantilla_tipo == 'EXITO' or 'exito' in filename_lower:
         return rellenar_plantilla_exito(tpl_path, factura)
+
+    # 4. Cualquier otra plantilla con etiquetas Jinja (FRISBY, HOMECENTER, OLIMPICA, etc.)
     elif plantilla_tiene_jinja(tpl_path):
-        docxtpl_obj = DocxTemplate(tpl_path)
-        context = {
-            'serie': factura.serie,
-            'folio': factura.folio,
-            'cufe': factura.cufe,
-            'fecha_emision': factura.fecha_emision.strftime('%d/%m/%Y') if factura.fecha_emision else '',
-            'hora_emision': factura.hora_emision.strftime('%H:%M:%S') if factura.hora_emision else '',
-            'total': fmt_pesos(factura.total),
-            'subtotal': fmt_pesos(factura.subtotal or factura.total),
-            'iva': fmt_pesos(factura.iva),
-        }
-        docxtpl_obj.render(context)
-        out_stream = io.BytesIO()
-        docxtpl_obj.save(out_stream)
-        out_stream.seek(0)
-        doc = docx.Document(out_stream)
-        limpiar_resaltados(doc)
-        return doc
+        return render_jinja_documento(tpl_path, factura)
+
+    # 5. Plantilla estatica personalizada / OTRA
     else:
         return rellenar_factura_guia_estatica(tpl_path, factura)
+
 
 def generar_factura_word_bytes(factura, template_path=None):
     """Retorna un BytesIO con el archivo .docx de la factura"""
