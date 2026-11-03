@@ -843,14 +843,20 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
             if not obj.plantilla:
                 obj.plantilla = 'JUMBO'
 
-            # Enlazar o corregir factura base acorde a la plantilla
-            if not obj.factura_base:
-                obj.factura_base = Factura.objects.filter(plantilla=obj.plantilla, lote_generacion__isnull=True).first() or Factura.objects.filter(plantilla=obj.plantilla).first() or Factura.objects.order_by('-id').first()
-            elif obj.factura_base.plantilla != obj.plantilla:
-                if obj.plantilla in ('JUMBO', 'EXITO'):
-                    matching_base = Factura.objects.filter(plantilla=obj.plantilla, lote_generacion__isnull=True).first() or Factura.objects.filter(plantilla=obj.plantilla).first()
-                    if matching_base:
-                        obj.factura_base = matching_base
+            # Sincronizar plantilla DESDE la factura_base (la base manda, no el campo plantilla)
+            # Si hay factura_guia adjunta, NO reasignar factura_base (el archivo define la plantilla en runtime)
+            tiene_guia = bool(getattr(obj, 'factura_guia', None) and obj.factura_guia.name)
+            if obj.factura_base:
+                # La plantilla del lote debe coincidir con la de la factura_base
+                if obj.factura_base.plantilla and obj.factura_base.plantilla != obj.plantilla:
+                    obj.plantilla = obj.factura_base.plantilla
+            elif not tiene_guia:
+                # Si no hay base ni guia, buscar la base que coincida con la plantilla seleccionada
+                obj.factura_base = (
+                    Factura.objects.filter(plantilla=obj.plantilla, lote_generacion__isnull=True).first()
+                    or Factura.objects.filter(plantilla=obj.plantilla).first()
+                    or Factura.objects.order_by('-id').first()
+                )
 
             if not obj.fecha_inicio:
                 obj.fecha_inicio = timezone.localdate()

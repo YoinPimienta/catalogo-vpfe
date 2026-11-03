@@ -30,6 +30,11 @@ def buscar_factura(request):
     error = None
     factura = None
 
+    # Si llega cufe por GET (escaneo de QR), redirigir directamente al detalle
+    if request.method == 'GET' and cufe:
+        from django.shortcuts import redirect
+        return redirect('ver_factura', cufe=str(cufe).strip())
+
     if request.method == 'POST' and cufe:
         cufe_clean = str(cufe).strip()
         try:

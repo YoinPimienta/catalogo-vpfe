@@ -435,7 +435,7 @@ def rellenar_plantilla_jumbo(doc_path, factura):
         rem = f"REM{rem}"
 
     # Reemplazo de imágenes en partes DOCX
-    qr_stream = generar_qr_stream(f"{base_url}/?cufe={cufe}")
+    qr_stream = generar_qr_stream(f"{base_url}/factura/{cufe}/")
     qr_bytes = qr_stream.getvalue()
     if 'rId8' in doc.part.rels:
         doc.part.rels['rId8'].target_part._blob = qr_bytes
@@ -449,38 +449,86 @@ def rellenar_plantilla_jumbo(doc_path, factura):
     except Exception as e:
         print(f"Aviso al inyectar codigo de barras Jumbo: {e}")
 
-    # Reemplazo quirurgico en parrafos y runs exactos preservando estilos y tipografia
-    # Adicionalmente forzamos Calibri 8pt en los parrafos de CUFE y FACTURADOR
-    if len(doc.paragraphs) > 42:
+    # Reemplazo de CUFE y FACTURADOR buscando por contenido del parrafo, no por indice fijo.
+    # Esto es mas robusto ante plantillas con diferente numero de parrafos y evita
+    # que queden CUFEs duplicados del template original.
+    _p_cufe1 = None
+    _p_facturador = None
+    _p_cufe2 = None
+
+    for _idx_p, _p in enumerate(doc.paragraphs):
+        _txt = _p.text.strip()
+        if _txt == 'CUFE : ' or _txt == 'CUFE :' or _txt == 'CUFE:':
+            # El siguiente parrafo no-vacio despues de "CUFE :" es el valor del cufe
+            if _p_cufe1 is None and _idx_p + 1 < len(doc.paragraphs):
+                _p_cufe1 = doc.paragraphs[_idx_p + 1]
+        elif 'FACTURADOR' in _txt and ':' in _txt and _p_facturador is None:
+            _p_facturador = _p
+            # El parrafo siguiente al FACTURADOR que no este vacio es el segundo CUFE
+            for _j in range(_idx_p + 1, min(_idx_p + 4, len(doc.paragraphs))):
+                _txt2 = doc.paragraphs[_j].text.strip()
+                if _txt2 and 'FACTURADOR' not in _txt2 and '---' not in _txt2:
+                    _p_cufe2 = doc.paragraphs[_j]
+                    break
+
+    if _p_cufe1 is not None:
+        # Limpiar todos los runs y poner el CUFE en el primero
+        for _r in _p_cufe1.runs:
+            _r.text = ""
+        if _p_cufe1.runs:
+            _p_cufe1.runs[0].text = cufe
+        else:
+            _p_cufe1.text = cufe
+        for _r in _p_cufe1.runs:
+            _forzar_fuente_8pt(_r)
+    elif len(doc.paragraphs) > 42:
         p42 = doc.paragraphs[42]
+        for _r in p42.runs:
+            _r.text = ""
         if p42.runs:
             p42.runs[0].text = cufe
-            for r in p42.runs[1:]:
-                r.text = ""
         else:
             p42.text = cufe
-        for r in p42.runs:
-            _forzar_fuente_8pt(r)
+        for _r in p42.runs:
+            _forzar_fuente_8pt(_r)
 
-    if len(doc.paragraphs) > 44:
+    if _p_facturador is not None:
+        if len(_p_facturador.runs) >= 3:
+            _p_facturador.runs[1].text = f"{serie}- {folio}"
+            for _r in _p_facturador.runs[2:]:
+                _r.text = ""
+        else:
+            _p_facturador.text = f"  FACTURADOR  :  {serie}- {folio}   - CUFE "
+        for _r in _p_facturador.runs:
+            _forzar_fuente_8pt(_r)
+    elif len(doc.paragraphs) > 44:
         p44 = doc.paragraphs[44]
         if len(p44.runs) >= 3:
             p44.runs[1].text = f"{serie}- {folio}"
         else:
             p44.text = f"  FACTURADOR  :  {serie}- {folio}   - CUFE "
-        for r in p44.runs:
-            _forzar_fuente_8pt(r)
+        for _r in p44.runs:
+            _forzar_fuente_8pt(_r)
 
-    if len(doc.paragraphs) > 45:
+    if _p_cufe2 is not None:
+        for _r in _p_cufe2.runs:
+            _r.text = ""
+        if _p_cufe2.runs:
+            _p_cufe2.runs[0].text = cufe
+        else:
+            _p_cufe2.text = cufe
+        for _r in _p_cufe2.runs:
+            _forzar_fuente_8pt(_r)
+    elif len(doc.paragraphs) > 45:
         p45 = doc.paragraphs[45]
+        for _r in p45.runs:
+            _r.text = ""
         if p45.runs:
             p45.runs[0].text = cufe
-            for r in p45.runs[1:]:
-                r.text = ""
         else:
             p45.text = cufe
-        for r in p45.runs:
-            _forzar_fuente_8pt(r)
+        for _r in p45.runs:
+            _forzar_fuente_8pt(_r)
 
     if len(doc.paragraphs) > 52:
         p52 = doc.paragraphs[52]
@@ -598,7 +646,7 @@ def rellenar_plantilla_exito(doc_path, factura):
     tr_formatted = f"{tr_int:04d}"
 
     # Reemplazo de imágenes en partes DOCX (rId6 = QR, rId7 = Barcode)
-    qr_stream = generar_qr_stream(f"{base_url}/?cufe={cufe}")
+    qr_stream = generar_qr_stream(f"{base_url}/factura/{cufe}/")
     qr_bytes = qr_stream.getvalue()
     if 'rId6' in doc.part.rels:
         doc.part.rels['rId6'].target_part._blob = qr_bytes
@@ -732,7 +780,7 @@ def rellenar_factura_guia_estatica(doc_path, factura):
     base_serie = str(factura_base.serie).strip() if factura_base and factura_base.serie else None
 
     # 1. Reemplazo de Codigo QR
-    qr_stream = generar_qr_stream(f"{base_url}/?cufe={cufe}")
+    qr_stream = generar_qr_stream(f"{base_url}/factura/{cufe}/")
     qr_bytes = qr_stream.getvalue()
 
     qr_rid_identified = None
@@ -937,7 +985,7 @@ class AutoSafeUndefined(jinja2.Undefined):
 def construir_contexto_factura(factura, docxtpl_obj=None):
     base_url = os.environ.get('APP_DOMAIN') or os.environ.get('RENDER_EXTERNAL_URL') or 'https://catalogo-vpfe1.onrender.com'
     base_url = base_url.rstrip('/')
-    qr_url = f"{base_url}/?cufe={factura.cufe}"
+    qr_url = f"{base_url}/factura/{factura.cufe}/"
 
     qr_image = None
     bc_image = None
