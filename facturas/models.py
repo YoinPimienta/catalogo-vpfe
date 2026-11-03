@@ -282,6 +282,20 @@ class LoteGeneracionFacturas(models.Model):
         verbose_name="Salto / Incremento de Folio",
         help_text="Incremento entre cada factura. Ej: 1 (consecutivo 1 en 1), 7 (de 7 en 7), 9 (de 9 en 9), 15 (de 15 en 15), o un rango aleatorio como 6-15."
     )
+    receptor_nombre = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name="Nombre / Razón Social del Receptor",
+        help_text="Opcional. Nombre del cliente o receptor para todas las facturas de este lote. Si se deja vacío, tomará el de la factura base."
+    )
+    receptor_nit = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        verbose_name="NIT / Cédula del Receptor",
+        help_text="Opcional. NIT o documento de identificación del cliente/receptor para este lote."
+    )
     productos_texto = models.TextField(
         blank=True,
         null=True,

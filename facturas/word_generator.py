@@ -385,8 +385,15 @@ def _forzar_fuente_8pt(run):
     """
     from docx.oxml.ns import qn
     from lxml import etree
+    run.font.name = 'Calibri'
     run.font.size = Pt(8)
     rPr = run._r.get_or_add_rPr()
+    rFonts = rPr.find(qn('w:rFonts'))
+    if rFonts is None:
+        rFonts = etree.SubElement(rPr, qn('w:rFonts'))
+    rFonts.set(qn('w:ascii'), 'Calibri')
+    rFonts.set(qn('w:hAnsi'), 'Calibri')
+    rFonts.set(qn('w:cs'), 'Calibri')
     for tag in ('w:sz', 'w:szCs'):
         elem = rPr.find(qn(tag))
         if elem is None:
@@ -449,86 +456,41 @@ def rellenar_plantilla_jumbo(doc_path, factura):
     except Exception as e:
         print(f"Aviso al inyectar codigo de barras Jumbo: {e}")
 
-    # Reemplazo de CUFE y FACTURADOR buscando por contenido del parrafo, no por indice fijo.
-    # Esto es mas robusto ante plantillas con diferente numero de parrafos y evita
-    # que queden CUFEs duplicados del template original.
-    _p_cufe1 = None
-    _p_facturador = None
-    _p_cufe2 = None
-
-    for _idx_p, _p in enumerate(doc.paragraphs):
-        _txt = _p.text.strip()
-        if _txt == 'CUFE : ' or _txt == 'CUFE :' or _txt == 'CUFE:':
-            # El siguiente parrafo no-vacio despues de "CUFE :" es el valor del cufe
-            if _p_cufe1 is None and _idx_p + 1 < len(doc.paragraphs):
-                _p_cufe1 = doc.paragraphs[_idx_p + 1]
-        elif 'FACTURADOR' in _txt and ':' in _txt and _p_facturador is None:
-            _p_facturador = _p
-            # El parrafo siguiente al FACTURADOR que no este vacio es el segundo CUFE
-            for _j in range(_idx_p + 1, min(_idx_p + 4, len(doc.paragraphs))):
-                _txt2 = doc.paragraphs[_j].text.strip()
-                if _txt2 and 'FACTURADOR' not in _txt2 and '---' not in _txt2:
-                    _p_cufe2 = doc.paragraphs[_j]
+    # Reemplazo de CUFE y FACTURADOR con limpieza agresiva de residuos y fuente Calibri 8pt
+    for idx_p, p in enumerate(doc.paragraphs):
+        p_text = p.text.strip()
+        if p_text in ('CUFE :', 'CUFE : ', 'CUFE:'):
+            # El parrafo siguiente es el CUFE superior
+            if idx_p + 1 < len(doc.paragraphs):
+                p_cufe = doc.paragraphs[idx_p + 1]
+                p_cufe.text = cufe
+                for r in p_cufe.runs:
+                    _forzar_fuente_8pt(r)
+            # Si hay parrafos residuales antes del QR, vaciarlos
+            for sub_i in range(idx_p + 2, min(idx_p + 5, len(doc.paragraphs))):
+                p_sub = doc.paragraphs[sub_i]
+                if 'drawing' in p_sub._p.xml or 'graphic' in p_sub._p.xml or 'FACTURADOR' in p_sub.text:
                     break
-
-    if _p_cufe1 is not None:
-        # Limpiar todos los runs y poner el CUFE en el primero
-        for _r in _p_cufe1.runs:
-            _r.text = ""
-        if _p_cufe1.runs:
-            _p_cufe1.runs[0].text = cufe
-        else:
-            _p_cufe1.text = cufe
-        for _r in _p_cufe1.runs:
-            _forzar_fuente_8pt(_r)
-    elif len(doc.paragraphs) > 42:
-        p42 = doc.paragraphs[42]
-        for _r in p42.runs:
-            _r.text = ""
-        if p42.runs:
-            p42.runs[0].text = cufe
-        else:
-            p42.text = cufe
-        for _r in p42.runs:
-            _forzar_fuente_8pt(_r)
-
-    if _p_facturador is not None:
-        if len(_p_facturador.runs) >= 3:
-            _p_facturador.runs[1].text = f"{serie}- {folio}"
-            for _r in _p_facturador.runs[2:]:
-                _r.text = ""
-        else:
-            _p_facturador.text = f"  FACTURADOR  :  {serie}- {folio}   - CUFE "
-        for _r in _p_facturador.runs:
-            _forzar_fuente_8pt(_r)
-    elif len(doc.paragraphs) > 44:
-        p44 = doc.paragraphs[44]
-        if len(p44.runs) >= 3:
-            p44.runs[1].text = f"{serie}- {folio}"
-        else:
-            p44.text = f"  FACTURADOR  :  {serie}- {folio}   - CUFE "
-        for _r in p44.runs:
-            _forzar_fuente_8pt(_r)
-
-    if _p_cufe2 is not None:
-        for _r in _p_cufe2.runs:
-            _r.text = ""
-        if _p_cufe2.runs:
-            _p_cufe2.runs[0].text = cufe
-        else:
-            _p_cufe2.text = cufe
-        for _r in _p_cufe2.runs:
-            _forzar_fuente_8pt(_r)
-    elif len(doc.paragraphs) > 45:
-        p45 = doc.paragraphs[45]
-        for _r in p45.runs:
-            _r.text = ""
-        if p45.runs:
-            p45.runs[0].text = cufe
-        else:
-            p45.text = cufe
-        for _r in p45.runs:
-            _forzar_fuente_8pt(_r)
+                p_sub.text = ""
+        elif 'FACTURADOR' in p_text and ('CUFE' in p_text or ':' in p_text):
+            p.text = f"  FACTURADOR  :  {serie}- {folio}   - CUFE "
+            for r in p.runs:
+                _forzar_fuente_8pt(r)
+            # Los siguientes parrafos: el primero tendra el CUFE y los demas se VACIAN
+            p_cufe_colocado = False
+            for next_idx in range(idx_p + 1, min(idx_p + 7, len(doc.paragraphs))):
+                p_next = doc.paragraphs[next_idx]
+                txt_next = p_next.text.strip()
+                if '----' in txt_next or 'Cadena' in txt_next or 'RESOL' in txt_next or 'FAC.' in txt_next:
+                    break
+                if not p_cufe_colocado:
+                    p_next.text = cufe
+                    for r in p_next.runs:
+                        _forzar_fuente_8pt(r)
+                    p_cufe_colocado = True
+                else:
+                    # Vaciar cualquier residuo del CUFE viejo (como q7e8f9ik..., ac994..., etc.)
+                    p_next.text = ""
 
     if len(doc.paragraphs) > 52:
         p52 = doc.paragraphs[52]
@@ -843,23 +805,40 @@ def rellenar_factura_guia_estatica(doc_path, factura):
     for idx, p in enumerate(doc.paragraphs):
         p_text = p.text
 
-        # CUFE
-        if 'CUFE :' in p_text or 'CUFE:' in p_text or 'Cufe:' in p_text:
-            m_hex = re.search(r'(?:CUFE\s*:\s*|Cufe:)([0-9a-fA-F]{20,})', p_text)
-            if m_hex and idx + 1 < total_paragraphs and re.match(r'^[0-9a-fA-F]{15,}$', doc.paragraphs[idx + 1].text.strip()):
-                p.text = f"Cufe:{cufe[:34]}"
-                doc.paragraphs[idx + 1].text = cufe[34:64]
-                continue
-            elif m_hex:
-                p.text = re.sub(r'(?:CUFE\s*:\s*|Cufe:)[0-9a-fA-F]{20,}', f"Cufe:{cufe}", p_text)
-                continue
-            elif idx + 1 < total_paragraphs:
-                next_p = doc.paragraphs[idx + 1]
-                if re.match(r'^[0-9a-fA-F]{30,}$', next_p.text.strip()) or len(next_p.text.strip()) > 25:
-                    next_p.text = cufe
-                    continue
-        elif re.match(r'^[0-9a-fA-F]{40,96}$', p_text.strip()):
-            p.text = cufe
+        # CUFE y FACTURADOR con limpieza completa de residuos
+        if p_text.strip() in ('CUFE :', 'CUFE : ', 'CUFE:'):
+            if idx + 1 < total_paragraphs:
+                p_next = doc.paragraphs[idx + 1]
+                p_next.text = cufe
+                for r in p_next.runs:
+                    _forzar_fuente_8pt(r)
+            # Vaciar lineas residuales del CUFE antes del QR
+            for sub_i in range(idx + 2, min(idx + 5, total_paragraphs)):
+                p_sub = doc.paragraphs[sub_i]
+                if 'drawing' in p_sub._p.xml or 'graphic' in p_sub._p.xml or 'FACTURADOR' in p_sub.text:
+                    break
+                p_sub.text = ""
+            continue
+        elif 'FACTURADOR' in p_text and ('CUFE' in p_text or ':' in p_text):
+            p.text = f"  FACTURADOR  :  {serie}- {folio}   - CUFE "
+            for r in p.runs:
+                _forzar_fuente_8pt(r)
+            p_cufe_colocado = False
+            for next_idx in range(idx + 1, min(idx + 7, total_paragraphs)):
+                p_next = doc.paragraphs[next_idx]
+                txt_next = p_next.text.strip()
+                if '----' in txt_next or 'Cadena' in txt_next or 'RESOL' in txt_next or 'FAC.' in txt_next:
+                    break
+                if not p_cufe_colocado:
+                    p_next.text = cufe
+                    for r in p_next.runs:
+                        _forzar_fuente_8pt(r)
+                    p_cufe_colocado = True
+                else:
+                    p_next.text = ""
+            continue
+        elif re.match(r'^[0-9a-zA-Z\s]{25,120}$', p_text.strip()) and any(k in doc.paragraphs[max(0, idx-2)].text for k in ('CUFE', 'FACTURADOR', 'Cufe')):
+            p.text = ""
             continue
 
         # Reemplazo de Folio y Serie
@@ -878,8 +857,6 @@ def rellenar_factura_guia_estatica(doc_path, factura):
                 reemplazar_en_parrafo(p, re.escape(base_folio), folio)
         elif 'NUMERO:' in p_text.upper():
             reemplazar_en_parrafo(p, r'(NUMERO:\s*)([A-Za-z0-9\-_]+)', fr"\g<1>{numero_factura}")
-        elif 'FACTURADOR  :' in p_text:
-            reemplazar_en_parrafo(p, r'(FACTURADOR\s*:\s*)([A-Za-z0-9]+-\s*[0-9]+)', fr"\g<1>{serie}- {folio}")
         elif 'FAC.    ELECTRONICA   DE  VENTA' in p_text:
             reemplazar_en_parrafo(p, r'(FAC\.\s+ELECTRONICA\s+DE\s+VENTA\s+)([A-Za-z0-9]+\s+[0-9]+)', fr"\g<1>{serie}  {folio}")
 
@@ -1232,6 +1209,11 @@ def generar_documento_factura(factura, template_path=None):
     if factura.lote_generacion and factura.lote_generacion.factura_guia and os.path.exists(factura.lote_generacion.factura_guia.path):
         if plantilla_tiene_jinja(tpl_path):
             return render_jinja_documento(tpl_path, factura)
+        guia_lower = os.path.basename(tpl_path).lower()
+        if 'jumbo' in guia_lower or 'cencosud' in guia_lower or (factura.serie and factura.serie.startswith('AU')):
+            return rellenar_plantilla_jumbo(tpl_path, factura)
+        elif 'exito' in guia_lower or (factura.serie and factura.serie.startswith('WJ')):
+            return rellenar_plantilla_exito(tpl_path, factura)
         else:
             return rellenar_factura_guia_estatica(tpl_path, factura)
 

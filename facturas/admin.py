@@ -194,23 +194,35 @@ class ProductoInline(admin.TabularInline):
     fields = ('codigo', 'nombre', 'unidad_medida', 'cantidad', 'valor_unitario', 'precio_incluye_impuesto', 'descuento', 'impuesto', 'impuesto_inc', 'total_linea')
     readonly_fields = ('total_linea',)
 
-def ejecutar_generacion_masiva_para_lote(lote, usuario=None, cajero_custom=None, serie_custom=None, folio_inicial=None, incremento_folio_val=1, comportamiento_vencimiento='plazo_relativo', productos_texto=None):
+def ejecutar_generacion_masiva_para_lote(lote, usuario=None, serie_custom=None, folio_inicial=None,
+                                         comportamiento_vencimiento='plazo_relativo', 
+                                         cajero_custom=None, incremento_folio_val='1',
+                                         productos_texto=None):
     """
-    Función centralizada para generar todas las facturas y productos de un lote.
-    Garantiza QR dinámico, CUFE único, horas realistas distribuidas y folios consecutivos.
+    Ejecuta la generacion de facturas consecutivas respetando 100% las especificaciones DIAN,
+    emisor, receptor, plantillas y calculos de totales.
     """
     import random
     from django.utils import timezone
+    
+    plantilla_lote = getattr(lote, 'plantilla', 'JUMBO') or 'JUMBO'
+    guia_name = lote.factura_guia.name.upper() if (getattr(lote, 'factura_guia', None) and lote.factura_guia.name) else ''
+    
+    if 'EXITO' in guia_name or (serie_custom and serie_custom.upper().startswith('WJ')):
+        plantilla_lote = 'EXITO'
+    elif 'JUMBO' in guia_name or 'CENCOSUD' in guia_name or (serie_custom and serie_custom.upper().startswith('AU')):
+        plantilla_lote = 'JUMBO'
+        
     factura_base = lote.factura_base
-    if not factura_base:
-        factura_base = Factura.objects.filter(plantilla=getattr(lote, 'plantilla', 'JUMBO'), lote_generacion__isnull=True).first() or \
-                       Factura.objects.filter(plantilla=getattr(lote, 'plantilla', 'JUMBO')).first() or \
-                       Factura.objects.order_by('id').first()
+    if not factura_base or factura_base.plantilla != plantilla_lote:
+        factura_base = (
+            Factura.objects.filter(plantilla=plantilla_lote, lote_generacion__isnull=True).first()
+            or Factura.objects.filter(plantilla=plantilla_lote).first()
+            or Factura.objects.order_by('id').first()
+        )
         if factura_base and getattr(lote, 'id', None):
             lote.factura_base = factura_base
             LoteGeneracionFacturas.objects.filter(id=lote.id).update(factura_base=factura_base)
-    if not factura_base:
-        return []
 
     cantidad = lote.cantidad_generada or 1
     fecha_inicial = lote.fecha_inicio or timezone.localdate()
@@ -218,13 +230,27 @@ def ejecutar_generacion_masiva_para_lote(lote, usuario=None, cajero_custom=None,
     facturas_por_dia = lote.facturas_por_dia or 1
     hora_inicial = lote.hora_inicial or datetime.time(8, 0)
     hora_final = lote.hora_final or datetime.time(20, 0)
-    serie_a_usar = serie_custom.strip().upper() if serie_custom else (lote.serie.strip().upper() if lote and getattr(lote, 'serie', None) else factura_base.serie)
+    
+    # Serie
+    if serie_custom:
+        serie_a_usar = serie_custom.strip().upper()
+    elif lote and getattr(lote, 'serie', None):
+        serie_a_usar = lote.serie.strip().upper()
+    elif plantilla_lote == 'EXITO':
+        serie_a_usar = 'WJ53'
+    else:
+        serie_a_usar = 'AU06'
 
     if not folio_inicial:
-        folio_inicial = lote.folio_inicial if lote and getattr(lote, 'folio_inicial', None) else increment_folio(factura_base.folio, 1)
+        if lote and getattr(lote, 'folio_inicial', None):
+            folio_inicial = lote.folio_inicial
+        elif factura_base and factura_base.folio:
+            folio_inicial = increment_folio(factura_base.folio, 1)
+        else:
+            folio_inicial = '3425560' if plantilla_lote == 'JUMBO' else '44670'
 
     dias_plazo = 0
-    if factura_base.fecha_emision and factura_base.fecha_vencimiento:
+    if factura_base and factura_base.fecha_emision and factura_base.fecha_vencimiento:
         dias_plazo = (factura_base.fecha_vencimiento - factura_base.fecha_emision).days
 
     min_ini = hora_inicial.hour * 60 + hora_inicial.minute
@@ -232,15 +258,39 @@ def ejecutar_generacion_masiva_para_lote(lote, usuario=None, cajero_custom=None,
     if min_fin <= min_ini:
         min_fin = min_ini + 600
 
-    try:
-        base_tr = int(re.sub(r'\D', '', factura_base.transaccion or '9981') or '9981')
-    except Exception:
-        base_tr = 9981
+    base_tr = 9981
+    if factura_base and factura_base.transaccion:
+        try:
+            base_tr = int(re.sub(r'\D', '', factura_base.transaccion) or '9981')
+        except Exception:
+            base_tr = 9981
 
-    try:
-        base_rem = int(re.sub(r'\D', '', factura_base.rem or '9589') or '9589')
-    except Exception:
-        base_rem = 9589
+    base_rem = 9589
+    if factura_base and factura_base.rem:
+        try:
+            base_rem = int(re.sub(r'\D', '', factura_base.rem) or '9589')
+        except Exception:
+            base_rem = 9589
+
+    # Emisor segun plantilla garantizado
+    if plantilla_lote == 'EXITO':
+        em_nombre = 'ALMACENES EXITO S.A'
+        em_nit = '8909006089'
+    else:
+        em_nombre = 'CENCOSUD COLOMBIA S.A'
+        em_nit = '900.155.107-1'
+
+    # Receptor del lote o de la base o por defecto
+    rec_nombre = (getattr(lote, 'receptor_nombre', None) or '').strip()
+    rec_nit = (getattr(lote, 'receptor_nit', None) or '').strip()
+    if not rec_nombre and factura_base:
+        rec_nombre = factura_base.receptor_nombre
+    if not rec_nit and factura_base:
+        rec_nit = factura_base.receptor_nit
+    if not rec_nombre:
+        rec_nombre = 'CONSUMIDOR FINAL'
+    if not rec_nit:
+        rec_nit = '222222222222'
 
     facturas_creadas = []
     current_folio = folio_inicial
@@ -258,7 +308,6 @@ def ejecutar_generacion_masiva_para_lote(lote, usuario=None, cajero_custom=None,
         else:
             fecha_vencimiento_nueva = None
 
-        # Asegurar que el folio no esté repetido
         while Factura.objects.filter(serie=serie_a_usar, folio=current_folio).exists():
             current_folio = increment_folio(current_folio, 1)
 
@@ -266,7 +315,6 @@ def ejecutar_generacion_masiva_para_lote(lote, usuario=None, cajero_custom=None,
         salto_step = parse_salto_folio(incremento_folio_val or getattr(lote, 'salto_folio', '1') or '1')
         current_folio = increment_folio(current_folio, salto_step)
 
-        # Cálculo de hora realista y única
         indice_en_dia = i % facturas_por_dia
         total_en_este_dia = min(facturas_por_dia, cantidad - (dia_offset * facturas_por_dia))
         if cantidad == 1:
@@ -288,75 +336,69 @@ def ejecutar_generacion_masiva_para_lote(lote, usuario=None, cajero_custom=None,
         rem_calculado = f"REM{base_rem + i + 1:05d}"
 
         copia_factura = Factura(
-            plantilla=lote.plantilla or getattr(factura_base, 'plantilla', 'JUMBO'),
+            plantilla=plantilla_lote,
             lote_generacion=lote,
             serie=serie_a_usar,
             folio=folio_a_usar,
             fecha_emision=fecha_emision_nueva,
             hora_emision=hora_calculada,
             fecha_vencimiento=fecha_vencimiento_nueva,
-            cajero=cajero_custom or getattr(factura_base, 'cajero', 'ZAPATA MICHAELL'),
-            terminal=getattr(factura_base, 'terminal', '1034'),
-            registro=getattr(factura_base, 'registro', '05'),
+            cajero=cajero_custom or (getattr(factura_base, 'cajero', 'ZAPATA MICHAELL') if factura_base else 'ZAPATA MICHAELL'),
+            terminal=getattr(factura_base, 'terminal', '1034') if factura_base else '1034',
+            registro=getattr(factura_base, 'registro', '05') if factura_base else '05',
             transaccion=tr_calculado,
             rem=rem_calculado,
             cufe="",
             qr_code="",
-            tipo_operacion=factura_base.tipo_operacion,
-            forma_pago=factura_base.forma_pago,
-            medio_pago=factura_base.medio_pago,
-            orden_pedido=factura_base.orden_pedido,
-            fecha_orden_pedido=factura_base.fecha_orden_pedido,
+            tipo_operacion=getattr(factura_base, 'tipo_operacion', '10 - Estándar') if factura_base else '10 - Estándar',
+            forma_pago=getattr(factura_base, 'forma_pago', '1 - Contado') if factura_base else '1 - Contado',
+            medio_pago=getattr(factura_base, 'medio_pago', '10 - Efectivo') if factura_base else '10 - Efectivo',
+            orden_pedido=getattr(factura_base, 'orden_pedido', '') if factura_base else '',
+            fecha_orden_pedido=getattr(factura_base, 'fecha_orden_pedido', None) if factura_base else None,
             
             # Emisor
-            emisor_nombre=factura_base.emisor_nombre,
-            emisor_nit=factura_base.emisor_nit,
-            emisor_tipo_contribuyente=factura_base.emisor_tipo_contribuyente,
-            emisor_regimen_fiscal=factura_base.emisor_regimen_fiscal,
-            emisor_responsabilidad_tributaria=factura_base.emisor_responsabilidad_tributaria,
-            emisor_pais=factura_base.emisor_pais,
-            emisor_departamento=factura_base.emisor_departamento,
-            emisor_municipio=factura_base.emisor_municipio,
-            emisor_direccion=factura_base.emisor_direccion,
-            emisor_telefono=factura_base.emisor_telefono,
-            emisor_correo=factura_base.emisor_correo,
+            emisor_nombre=em_nombre,
+            emisor_nit=em_nit,
+            emisor_tipo_contribuyente=getattr(factura_base, 'emisor_tipo_contribuyente', 'Persona Jurídica') if factura_base else 'Persona Jurídica',
+            emisor_regimen_fiscal=getattr(factura_base, 'emisor_regimen_fiscal', '48 - Responsable del impuesto sobre las ventas - IVA') if factura_base else '48 - Responsable del impuesto sobre las ventas - IVA',
+            emisor_responsabilidad_tributaria=getattr(factura_base, 'emisor_responsabilidad_tributaria', 'R-99-PN') if factura_base else 'R-99-PN',
+            emisor_pais=getattr(factura_base, 'emisor_pais', 'Colombia') if factura_base else 'Colombia',
+            emisor_departamento=getattr(factura_base, 'emisor_departamento', 'Antioquia') if factura_base else 'Antioquia',
+            emisor_municipio=getattr(factura_base, 'emisor_municipio', 'Medellín') if factura_base else 'Medellín',
+            emisor_direccion=getattr(factura_base, 'emisor_direccion', 'AV EL POBLADO CRA 43A') if factura_base else 'AV EL POBLADO CRA 43A',
+            emisor_telefono=getattr(factura_base, 'emisor_telefono', '6045013012') if factura_base else '6045013012',
+            emisor_correo=getattr(factura_base, 'emisor_correo', 'facturaelectronica@cencosud.com.co') if factura_base else 'facturaelectronica@cencosud.com.co',
             
             # Receptor
-            receptor_nombre=factura_base.receptor_nombre,
-            receptor_nit=factura_base.receptor_nit,
-            receptor_tipo_documento=factura_base.receptor_tipo_documento,
-            receptor_tipo_contribuyente=factura_base.receptor_tipo_contribuyente,
-            receptor_regimen_fiscal=factura_base.receptor_regimen_fiscal,
-            receptor_responsabilidad_tributaria=factura_base.receptor_responsabilidad_tributaria,
-            receptor_pais=factura_base.receptor_pais,
-            receptor_departamento=factura_base.receptor_departamento,
-            receptor_municipio=factura_base.receptor_municipio,
-            receptor_direccion=factura_base.receptor_direccion,
-            receptor_telefono=factura_base.receptor_telefono,
-            receptor_correo=factura_base.receptor_correo,
+            receptor_nombre=rec_nombre,
+            receptor_nit=rec_nit,
+            receptor_tipo_documento=getattr(factura_base, 'receptor_tipo_documento', '13 - Cédula de ciudadanía') if factura_base else '13 - Cédula de ciudadanía',
+            receptor_tipo_contribuyente=getattr(factura_base, 'receptor_tipo_contribuyente', 'Persona Natural') if factura_base else 'Persona Natural',
+            receptor_regimen_fiscal=getattr(factura_base, 'receptor_regimen_fiscal', '49 - No responsable de IVA') if factura_base else '49 - No responsable de IVA',
+            receptor_responsabilidad_tributaria=getattr(factura_base, 'receptor_responsabilidad_tributaria', 'R-99-PN') if factura_base else 'R-99-PN',
+            receptor_pais=getattr(factura_base, 'receptor_pais', 'Colombia') if factura_base else 'Colombia',
+            receptor_departamento=getattr(factura_base, 'receptor_departamento', 'Antioquia') if factura_base else 'Antioquia',
+            receptor_municipio=getattr(factura_base, 'receptor_municipio', 'Medellín') if factura_base else 'Medellín',
+            receptor_direccion=getattr(factura_base, 'receptor_direccion', 'CALLE 10 # 40-20') if factura_base else 'CALLE 10 # 40-20',
+            receptor_telefono=getattr(factura_base, 'receptor_telefono', '3001234567') if factura_base else '3001234567',
+            receptor_correo=getattr(factura_base, 'receptor_correo', 'cliente@correo.com') if factura_base else 'cliente@correo.com',
             
             # Textos y DIAN
-            notas_finales=getattr(factura_base, 'notas_finales', ''),
-            texto_legal=factura_base.texto_legal,
-            xml_generado_por=factura_base.xml_generado_por,
-            pdf_generado_por=factura_base.pdf_generado_por,
-            numero_autorizacion=factura_base.numero_autorizacion,
-            rango_desde=factura_base.rango_desde,
-            rango_hasta=factura_base.rango_hasta,
-            vigencia=factura_base.vigencia,
-            fecha_validacion_dian=factura_base.fecha_validacion_dian,
+            notas_finales=getattr(factura_base, 'notas_finales', '') if factura_base else '',
+            texto_legal=getattr(factura_base, 'texto_legal', '') if factura_base else '',
+            xml_generado_por=getattr(factura_base, 'xml_generado_por', 'Cadena S.A.') if factura_base else 'Cadena S.A.',
+            pdf_generado_por=getattr(factura_base, 'pdf_generado_por', 'Cadena S.A.') if factura_base else 'Cadena S.A.',
+            numero_autorizacion=getattr(factura_base, 'numero_autorizacion', '18764095725499') if factura_base else '18764095725499',
+            rango_desde=getattr(factura_base, 'rango_desde', '0001055859') if factura_base else '0001055859',
+            rango_hasta=getattr(factura_base, 'rango_hasta', '0009999999') if factura_base else '0009999999',
+            vigencia=getattr(factura_base, 'vigencia', '18 MESES') if factura_base else '18 MESES',
+            fecha_validacion_dian=fecha_emision_nueva,
             
-            estado=getattr(factura_base, 'estado', 'Aceptada') or 'Aceptada',
-            moneda=getattr(factura_base, 'moneda', 'COP') or 'COP',
-            subtotal=getattr(factura_base, 'subtotal', Decimal('0')) or Decimal('0'),
-            iva=getattr(factura_base, 'iva', Decimal('0')) or Decimal('0'),
-            total=getattr(factura_base, 'total', Decimal('0')) or Decimal('0'),
-            otros_impuestos=getattr(factura_base, 'otros_impuestos', Decimal('0')) or Decimal('0'),
-            descuento_global=getattr(factura_base, 'descuento_global', Decimal('0')) or Decimal('0'),
-            recargo_global=getattr(factura_base, 'recargo_global', Decimal('0')) or Decimal('0'),
-            anticipos=getattr(factura_base, 'anticipos', Decimal('0')) or Decimal('0'),
-            rete_fuente=getattr(factura_base, 'rete_fuente', Decimal('0')) or Decimal('0'),
-            rete_iva=getattr(factura_base, 'rete_iva', Decimal('0')) or Decimal('0'),
+            estado='Aceptada',
+            moneda='COP',
+            subtotal=Decimal('36680.67'),
+            iva=Decimal('6969.33'),
+            total=Decimal('43650.00'),
         )
         copia_factura.save()
 
@@ -379,7 +421,7 @@ def ejecutar_generacion_masiva_para_lote(lote, usuario=None, cajero_custom=None,
                     impuesto_inc=Decimal('0'),
                     total_linea=p_info.get('total_linea', Decimal('0'))
                 )
-        else:
+        elif factura_base and factura_base.productos.exists():
             for producto_base in factura_base.productos.all():
                 Producto.objects.create(
                     factura=copia_factura,
@@ -394,12 +436,42 @@ def ejecutar_generacion_masiva_para_lote(lote, usuario=None, cajero_custom=None,
                     impuesto_inc=producto_base.impuesto_inc,
                     total_linea=producto_base.total_linea
                 )
+        else:
+            # Productos por defecto para que la factura NUNCA quede en cero
+            if plantilla_lote == 'EXITO':
+                Producto.objects.create(
+                    factura=copia_factura,
+                    codigo="3100827",
+                    nombre="Nevera DOOR COOLING LG No Frost",
+                    unidad_medida="94",
+                    cantidad=1,
+                    valor_unitario=Decimal("3365000.00"),
+                    precio_incluye_impuesto=True,
+                    descuento=Decimal("0"),
+                    impuesto=Decimal("0"),
+                    impuesto_inc=Decimal("0"),
+                    total_linea=Decimal("3365000.00")
+                )
+            else:
+                Producto.objects.create(
+                    factura=copia_factura,
+                    codigo="3669368",
+                    nombre="Jugo hit surtido pg 10 lev.12 200ml c-u",
+                    unidad_medida="94",
+                    cantidad=3,
+                    valor_unitario=Decimal("14550.00"),
+                    precio_incluye_impuesto=True,
+                    descuento=Decimal("0"),
+                    impuesto=Decimal("0"),
+                    impuesto_inc=Decimal("0"),
+                    total_linea=Decimal("43650.00")
+                )
 
         copia_factura.recalcular_totales()
+        copia_factura.save()
         facturas_creadas.append(copia_factura)
 
     return facturas_creadas
-
 
 @admin.register(Factura)
 
@@ -794,6 +866,7 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
                     'fields': (
                         ('plantilla', 'factura_guia'),
                         'factura_base',
+                        ('receptor_nombre', 'receptor_nit'),
                         ('serie', 'folio_inicial', 'salto_folio'),
                         'cantidad_generada',
                         ('fecha_inicio', 'fecha_fin'),
@@ -810,6 +883,9 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
         return (
             ('Información de Registro', {
                 'fields': ('plantilla', 'factura_guia', 'usuario_creador', 'fecha_creacion', 'factura_base', 'estado')
+            }),
+            ('Datos del Receptor', {
+                'fields': (('receptor_nombre', 'receptor_nit'),)
             }),
             ('Detalle de Generación Masiva', {
                 'fields': (('serie', 'folio_inicial', 'salto_folio'), 'cantidad_generada', 'fecha_inicio', 'fecha_fin', 'facturas_por_dia', 'hora_inicial', 'hora_final', 'observaciones')
