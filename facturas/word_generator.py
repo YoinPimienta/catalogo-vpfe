@@ -362,6 +362,37 @@ def generar_barcode_stream(code_text):
     stream.seek(0)
     return stream
 
+
+
+def generar_barcode_bytes_resized(code_text, target_width, target_height):
+    """
+    Genera un codigo de barras Code128 y lo redimensiona al tamano exacto del
+    placeholder original en el documento Word, para evitar desbordamiento de pagina.
+    target_width y target_height se expresan en pixeles.
+    """
+    stream = generar_barcode_stream(code_text)
+    img = Image.open(stream)
+    img_resized = img.resize((target_width, target_height), Image.LANCZOS)
+    out = io.BytesIO()
+    img_resized.save(out, format='PNG')
+    return out.getvalue()
+
+
+def _forzar_fuente_8pt(run):
+    """
+    Fuerza Calibri 8pt (sz=16 half-points) en el run dado, eliminando
+    cualquier herencia de tamano mayor proveniente del estilo de la plantilla.
+    """
+    from docx.oxml.ns import qn
+    from lxml import etree
+    run.font.size = Pt(8)
+    rPr = run._r.get_or_add_rPr()
+    for tag in ('w:sz', 'w:szCs'):
+        elem = rPr.find(qn(tag))
+        if elem is None:
+            elem = etree.SubElement(rPr, qn(tag))
+        elem.set(qn('w:val'), '16')
+
 def limpiar_resaltados(doc):
     """Elimina el fondo amarillo de todos los elementos XML (runs, oMath, pPr) para impresión profesional."""
     try:
@@ -410,15 +441,16 @@ def rellenar_plantilla_jumbo(doc_path, factura):
         doc.part.rels['rId8'].target_part._blob = qr_bytes
 
     # Inyeccion dinamica de codigo de barras Code 128 nitido para REM
+    # El placeholder original en JUMBO.docx mide 508x92 px; resizamos para no desbordar pagina
     try:
-        bc_stream = generar_barcode_stream(rem)
-        bc_bytes = bc_stream.getvalue()
+        bc_bytes = generar_barcode_bytes_resized(rem, target_width=508, target_height=92)
         if 'rId9' in doc.part.rels:
             doc.part.rels['rId9'].target_part._blob = bc_bytes
     except Exception as e:
         print(f"Aviso al inyectar codigo de barras Jumbo: {e}")
 
-    # Reemplazo quirúrgico en párrafos y runs exactos preservando estilos y tipografía
+    # Reemplazo quirurgico en parrafos y runs exactos preservando estilos y tipografia
+    # Adicionalmente forzamos Calibri 8pt en los parrafos de CUFE y FACTURADOR
     if len(doc.paragraphs) > 42:
         p42 = doc.paragraphs[42]
         if p42.runs:
@@ -427,6 +459,8 @@ def rellenar_plantilla_jumbo(doc_path, factura):
                 r.text = ""
         else:
             p42.text = cufe
+        for r in p42.runs:
+            _forzar_fuente_8pt(r)
 
     if len(doc.paragraphs) > 44:
         p44 = doc.paragraphs[44]
@@ -434,6 +468,8 @@ def rellenar_plantilla_jumbo(doc_path, factura):
             p44.runs[1].text = f"{serie}- {folio}"
         else:
             p44.text = f"  FACTURADOR  :  {serie}- {folio}   - CUFE "
+        for r in p44.runs:
+            _forzar_fuente_8pt(r)
 
     if len(doc.paragraphs) > 45:
         p45 = doc.paragraphs[45]
@@ -443,6 +479,8 @@ def rellenar_plantilla_jumbo(doc_path, factura):
                 r.text = ""
         else:
             p45.text = cufe
+        for r in p45.runs:
+            _forzar_fuente_8pt(r)
 
     if len(doc.paragraphs) > 52:
         p52 = doc.paragraphs[52]
@@ -566,9 +604,9 @@ def rellenar_plantilla_exito(doc_path, factura):
         doc.part.rels['rId6'].target_part._blob = qr_bytes
 
     # Inyeccion dinamica de codigo de barras Code 128 nitido para numero de factura
+    # El placeholder original en EXITO.docx mide 988x200 px; resizamos para no desbordar pagina
     try:
-        bc_stream = generar_barcode_stream(numero_factura)
-        bc_bytes = bc_stream.getvalue()
+        bc_bytes = generar_barcode_bytes_resized(numero_factura, target_width=988, target_height=200)
         if 'rId7' in doc.part.rels:
             doc.part.rels['rId7'].target_part._blob = bc_bytes
     except Exception as e:
