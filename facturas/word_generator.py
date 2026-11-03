@@ -50,13 +50,15 @@ def resolver_plantilla_factura(factura):
 
     plantillas_dir = os.path.join(settings.BASE_DIR, 'plantillas_base')
 
-    # Chequear campo plantilla explicito con validación inteligente frente al emisor
+    # Chequear campo plantilla explicito con validacion inteligente frente al emisor
     plantilla_val = getattr(factura, 'plantilla', None)
-    emisor_raw = (getattr(factura, 'emisor_nombre', '') or '').upper()
-    nit_raw = (getattr(factura, 'emisor_nit', '') or '').replace('.', '').replace('-', '').strip()
-    if plantilla_val == 'JUMBO' and ('EXITO' in emisor_raw or 'ÉXITO' in emisor_raw or '890900608' in nit_raw):
+    em_norm = normalizar_texto(getattr(factura, 'emisor_nombre', ''))
+    nit_norm = (getattr(factura, 'emisor_nit', '') or '').replace('.', '').replace('-', '').strip()
+    serie_norm = (getattr(factura, 'serie', '') or '').upper()
+
+    if 'EXITO' in em_norm or '890900608' in nit_norm or 'WJ53' in serie_norm:
         plantilla_val = 'EXITO'
-    elif plantilla_val == 'EXITO' and ('CENCOSUD' in emisor_raw or 'JUMBO' in emisor_raw or '900155107' in nit_raw):
+    elif 'CENCOSUD' in em_norm or 'JUMBO' in em_norm or '900155107' in nit_norm or 'AU06' in serie_norm:
         plantilla_val = 'JUMBO'
 
     if plantilla_val:
@@ -407,8 +409,14 @@ def rellenar_plantilla_jumbo(doc_path, factura):
     if 'rId8' in doc.part.rels:
         doc.part.rels['rId8'].target_part._blob = qr_bytes
 
-    # Se preserva exactamente el código de barras original de la plantilla de Jumbo
-    pass
+    # Inyeccion dinamica de codigo de barras Code 128 nitido para REM
+    try:
+        bc_stream = generar_barcode_stream(rem)
+        bc_bytes = bc_stream.getvalue()
+        if 'rId9' in doc.part.rels:
+            doc.part.rels['rId9'].target_part._blob = bc_bytes
+    except Exception as e:
+        print(f"Aviso al inyectar codigo de barras Jumbo: {e}")
 
     # Reemplazo quirúrgico en párrafos y runs exactos preservando estilos y tipografía
     if len(doc.paragraphs) > 42:
@@ -557,8 +565,14 @@ def rellenar_plantilla_exito(doc_path, factura):
     if 'rId6' in doc.part.rels:
         doc.part.rels['rId6'].target_part._blob = qr_bytes
 
-    # Se preserva exactamente el código de barras original de la plantilla de Éxito según requerimiento
-    pass
+    # Inyeccion dinamica de codigo de barras Code 128 nitido para numero de factura
+    try:
+        bc_stream = generar_barcode_stream(numero_factura)
+        bc_bytes = bc_stream.getvalue()
+        if 'rId7' in doc.part.rels:
+            doc.part.rels['rId7'].target_part._blob = bc_bytes
+    except Exception as e:
+        print(f"Aviso al inyectar codigo de barras Exito: {e}")
 
     # Reemplazo en párrafos buscando por contenido exacto para máxima fidelidad con el espaciado
     for idx, p in enumerate(doc.paragraphs):
@@ -1119,11 +1133,13 @@ def generar_documento_factura(factura, template_path=None):
 
     filename_lower = os.path.basename(tpl_path).lower()
     plantilla_tipo = getattr(factura, 'plantilla', '').upper()
-    emisor_raw = (getattr(factura, 'emisor_nombre', '') or '').upper()
-    nit_raw = (getattr(factura, 'emisor_nit', '') or '').replace('.', '').replace('-', '').strip()
-    if plantilla_tipo == 'JUMBO' and ('EXITO' in emisor_raw or 'ÉXITO' in emisor_raw or '890900608' in nit_raw):
+    em_norm = normalizar_texto(getattr(factura, 'emisor_nombre', ''))
+    nit_norm = (getattr(factura, 'emisor_nit', '') or '').replace('.', '').replace('-', '').strip()
+    serie_norm = (getattr(factura, 'serie', '') or '').upper()
+
+    if 'EXITO' in em_norm or '890900608' in nit_norm or 'WJ53' in serie_norm:
         plantilla_tipo = 'EXITO'
-    elif plantilla_tipo == 'EXITO' and ('CENCOSUD' in emisor_raw or 'JUMBO' in emisor_raw or '900155107' in nit_raw):
+    elif 'CENCOSUD' in em_norm or 'JUMBO' in em_norm or '900155107' in nit_norm or 'AU06' in serie_norm:
         plantilla_tipo = 'JUMBO'
 
     # 1. Si el lote tiene plantilla personalizada subida por el usuario (factura_guia):
@@ -1162,8 +1178,9 @@ def generar_lote_word_unificado_bytes(lote):
     """
     Combina todas las facturas de un lote en un unico archivo Word (.docx)
     separadas de forma continua en el formato de tirilla.
-    Altamente tolerante a fallos: garantiza siempre la devolucion de un .docx valido.
+    Optimizado con control de memoria y tiempo para Render.
     """
+    import gc, time
     facturas = list(lote.facturas.all().order_by('id'))
     
     # Si el lote no contiene facturas guardadas, intentar generar con su factura base
@@ -1201,22 +1218,35 @@ def generar_lote_word_unificado_bytes(lote):
     if doc_base is None:
         raise ValueError("No se pudo procesar ninguna factura del lote.")
 
-    # Combinar las siguientes facturas de forma segura
     otras_facturas = [f for f in facturas if f.id != factura_primera.id]
+    
+    # Cap de seguridad de hasta 40 facturas para el Word unificado
+    if len(otras_facturas) > 40:
+        otras_facturas = otras_facturas[:40]
+
     if otras_facturas:
         try:
             from docxcompose.composer import Composer
             composer = Composer(doc_base)
-            for f in otras_facturas:
+            t_start = time.time()
+            for idx, f in enumerate(otras_facturas):
+                # Limite preventivo de 25 segundos para evitar WORKER TIMEOUT de Gunicorn
+                if time.time() - t_start > 25.0:
+                    print(f"Aviso: limite de tiempo alcanzado al componer lote #{lote.id} ({idx+1} facturas unificadas)")
+                    break
                 try:
                     doc_next = generar_documento_factura(f)
                     composer.append(doc_next)
+                    del doc_next
                 except Exception as ex:
                     print(f"Aviso: omitiendo factura #{f.id} en la composicion unificada: {ex}")
+                
+                if (idx + 1) % 5 == 0:
+                    gc.collect()
         except Exception as e:
             print(f"Aviso en Composer: {e}")
 
-    # Guardar en stream con contingencia
+    gc.collect()
     stream = io.BytesIO()
     try:
         doc_base.save(stream)
@@ -1229,32 +1259,38 @@ def generar_lote_word_unificado_bytes(lote):
     stream.seek(0)
     return stream
 
-
 def generar_lote_zip_bytes(lote):
     """
     Genera un archivo comprimido .ZIP con:
     1. Todas las facturas individuales en .docx
-    2. El archivo Word unificado con todas las facturas juntas.
+    2. El archivo Word unificado con todas las facturas juntas (para lotes <= 30 facturas).
     """
-    facturas = lote.facturas.all().order_by('id')
-    if not facturas.exists():
+    import gc
+    facturas = list(lote.facturas.all().order_by('id'))
+    if not facturas:
         raise ValueError("El lote no contiene facturas.")
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
         # 1. Facturas individuales
-        for f in facturas:
+        for idx, f in enumerate(facturas):
             filename = f"Factura_{f.serie}_{f.folio}.docx"
             f_stream = generar_factura_word_bytes(f)
             zip_file.writestr(filename, f_stream.getvalue())
+            del f_stream
+            if (idx + 1) % 10 == 0:
+                gc.collect()
 
-        # 2. Documento unificado
-        try:
-            unificado_stream = generar_lote_word_unificado_bytes(lote)
-            unificado_filename = f"Lote_{lote.id}_Facturas_Unificadas_{lote.factura_base.serie if lote.factura_base else 'POS'}.docx"
-            zip_file.writestr(unificado_filename, unificado_stream.getvalue())
-        except Exception as e:
-            print("Error agregando unificado al zip:", e)
+        # 2. Documento unificado protegido
+        if len(facturas) <= 30:
+            try:
+                unificado_stream = generar_lote_word_unificado_bytes(lote)
+                unificado_filename = f"Lote_{lote.id}_Facturas_Unificadas_{lote.factura_base.serie if lote.factura_base else 'POS'}.docx"
+                zip_file.writestr(unificado_filename, unificado_stream.getvalue())
+                del unificado_stream
+            except Exception as e:
+                print(f"Aviso agregando unificado al zip: {e}")
 
+    gc.collect()
     zip_buffer.seek(0)
     return zip_buffer

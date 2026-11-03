@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vista Previa Tirilla - {{ factura.serie }}{{ factura.folio }}</title>
@@ -130,14 +131,14 @@
         }
 
         .receipt-media img.barcode-img {
-            max-width: 270px;
-            width: auto;
+            max-width: 280px;
+            width: 240px;
             height: auto;
-            max-height: 52px;
+            max-height: 65px;
+            display: block;
+            margin: 6px auto;
             image-rendering: -webkit-optimize-contrast;
             image-rendering: crisp-edges;
-            image-rendering: pixelated;
-            display: inline-block;
         }
 
         @media print {

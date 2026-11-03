@@ -111,32 +111,51 @@ def descargar_word_factura(request, cufe):
         return HttpResponse(error_msg, status=400, content_type="text/plain; charset=utf-8")
 
 def previsualizar_tirilla(request, cufe):
-    from .word_generator import generar_documento_factura
+    from .word_generator import generar_documento_factura, generar_barcode_stream, normalizar_texto
     factura = get_object_or_404(Factura, cufe=cufe)
     if not factura.qr_code:
         factura.generar_qr()
 
+    # Sincronizacion preventiva de plantilla segun datos del emisor
+    em_norm = normalizar_texto(factura.emisor_nombre or '')
+    nit_norm = (factura.emisor_nit or '').replace('.', '').replace('-', '').strip()
+    serie_norm = (factura.serie or '').upper()
+    plantilla_calc = (factura.plantilla or 'JUMBO').upper()
+
+    if 'EXITO' in em_norm or '890900608' in nit_norm or 'WJ53' in serie_norm:
+        plantilla_calc = 'EXITO'
+    elif 'CENCOSUD' in em_norm or 'JUMBO' in em_norm or '900155107' in nit_norm or 'AU06' in serie_norm:
+        plantilla_calc = 'JUMBO'
+
+    if factura.plantilla != plantilla_calc:
+        factura.plantilla = plantilla_calc
+        Factura.objects.filter(pk=factura.pk).update(plantilla=plantilla_calc)
+
     doc = generar_documento_factura(factura)
-    plantilla = (factura.plantilla or 'JUMBO').upper()
-    emisor_raw = (getattr(factura, 'emisor_nombre', '') or '').upper()
-    nit_raw = (getattr(factura, 'emisor_nit', '') or '').replace('.', '').replace('-', '').strip()
-    if plantilla == 'JUMBO' and ('EXITO' in emisor_raw or 'ÉXITO' in emisor_raw or '890900608' in nit_raw):
-        plantilla = 'EXITO'
-    elif plantilla == 'EXITO' and ('CENCOSUD' in emisor_raw or 'JUMBO' in emisor_raw or '900155107' in nit_raw):
-        plantilla = 'JUMBO'
 
-    qr_rid = 'rId6' if plantilla == 'EXITO' else 'rId8'
-    bc_rid = 'rId7' if plantilla == 'EXITO' else 'rId9'
+    qr_rid = 'rId6' if plantilla_calc == 'EXITO' else 'rId8'
+    bc_rid = 'rId7' if plantilla_calc == 'EXITO' else 'rId9'
 
+    import base64
     barcode_img_src = None
-    if bc_rid in doc.part.rels:
-        import base64
-        try:
-            img_blob = doc.part.rels[bc_rid].target_part.blob
-            b64 = base64.b64encode(img_blob).decode('utf-8')
-            barcode_img_src = f"data:image/png;base64,{b64}"
-        except Exception:
-            barcode_img_src = None
+    try:
+        if plantilla_calc == 'JUMBO':
+            rem_val = getattr(factura, 'rem', None) or f"REM{factura.folio[-5:] if factura.folio and len(factura.folio)>=5 else '09589'}"
+            bc_stream = generar_barcode_stream(rem_val)
+        else:
+            num_val = f"{factura.serie or 'WJ53'}{factura.folio or '44660'}"
+            bc_stream = generar_barcode_stream(num_val)
+        b64 = base64.b64encode(bc_stream.getvalue()).decode('utf-8')
+        barcode_img_src = f"data:image/png;base64,{b64}"
+    except Exception as ex:
+        print(f"Aviso al generar barcode preview: {ex}")
+        if bc_rid in doc.part.rels:
+            try:
+                img_blob = doc.part.rels[bc_rid].target_part.blob
+                b64 = base64.b64encode(img_blob).decode('utf-8')
+                barcode_img_src = f"data:image/png;base64,{b64}"
+            except Exception:
+                barcode_img_src = None
 
     lineas_tirilla = []
     for p in doc.paragraphs:
@@ -170,6 +189,7 @@ def previsualizar_tirilla(request, cufe):
         'lineas_tirilla': lineas_tirilla,
         'barcode_img_src': barcode_img_src or getattr(factura, 'barcode_image', None),
     })
+
 
 def descargar_lote_word_unificado(request, lote_id):
     try:

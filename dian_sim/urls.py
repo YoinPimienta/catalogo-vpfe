@@ -18,8 +18,10 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.http import HttpResponse
 
 urlpatterns = [
+    path('robots.txt', lambda r: HttpResponse('User-agent: *\nDisallow: /\n', content_type='text/plain')),
     path('admin/', admin.site.urls),
     path('', include('facturas.urls')),
 ]

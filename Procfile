@@ -1,2 +1,2 @@
-web: gunicorn dian_sim.wsgi --log-file - --worker-class gthread --workers 1 --threads 4 --timeout 120
-release: python manage.py migrate
+web: gunicorn dian_sim.wsgi -c gunicorn.conf.py
+release: python manage.py migrate --noinput

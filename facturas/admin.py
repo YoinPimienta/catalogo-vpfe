@@ -404,6 +404,32 @@ def ejecutar_generacion_masiva_para_lote(lote, usuario=None, cajero_custom=None,
 @admin.register(Factura)
 
 class FacturaAdmin(admin.ModelAdmin):
+    def save_model(self, request, obj, form, change):
+        from .word_generator import normalizar_texto
+        em = normalizar_texto(obj.emisor_nombre or '')
+        nit = (obj.emisor_nit or '').replace('.', '').replace('-', '').strip()
+        serie = (obj.serie or '').upper()
+
+        if obj.plantilla == 'EXITO':
+            if not obj.emisor_nombre or 'CENCOSUD' in em or 'JUMBO' in em:
+                obj.emisor_nombre = 'ALMACENES EXITO S.A'
+                obj.emisor_nit = '8909006089'
+                if not obj.serie or obj.serie in ('AU06', 'I041'):
+                    obj.serie = 'WJ53'
+        elif obj.plantilla == 'JUMBO':
+            if not obj.emisor_nombre or 'EXITO' in em:
+                obj.emisor_nombre = 'CENCOSUD COLOMBIA S.A'
+                obj.emisor_nit = '900.155.107-1'
+                if not obj.serie or obj.serie in ('WJ53', 'I041'):
+                    obj.serie = 'AU06'
+        else:
+            if 'EXITO' in em or '890900608' in nit or 'WJ53' in serie:
+                obj.plantilla = 'EXITO'
+            elif 'CENCOSUD' in em or 'JUMBO' in em or '900155107' in nit or 'AU06' in serie:
+                obj.plantilla = 'JUMBO'
+
+        super().save_model(request, obj, form, change)
+
     actions = ['actualizar_codigo_qr_action', 'descargar_seleccionadas_word_unificado_action', 'descargar_seleccionadas_zip_action', 'resetear_consecutivo_ids_action']
 
     @admin.action(description="Sincronizar y resetear consecutivo de IDs")
@@ -496,7 +522,7 @@ class FacturaAdmin(admin.ModelAdmin):
             'EXITO': '#eab308',
         }
         text_col = colores.get(obj.plantilla, '#94a3b8')
-        nombre = 'Jumbo' if obj.plantilla == 'JUMBO' else ('Éxito' if obj.plantilla == 'EXITO' else obj.plantilla)
+        nombre = 'Jumbo' if obj.plantilla == 'JUMBO' else ('Exito' if obj.plantilla == 'EXITO' else obj.plantilla)
         return mark_safe(f'<span style="color: {text_col}; font-weight: 500; font-size: 0.85rem;">{nombre}</span>')
     plantilla_badge.short_description = 'Plantilla'
 
@@ -731,7 +757,7 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
     plantilla_badge.short_description = 'Plantilla'
 
     def plantilla_badge(self, obj):
-        nombre = 'Jumbo' if obj.plantilla == 'JUMBO' else ('Éxito' if obj.plantilla == 'EXITO' else obj.plantilla)
+        nombre = 'Jumbo' if obj.plantilla == 'JUMBO' else ('Exito' if obj.plantilla == 'EXITO' else obj.plantilla)
         colores = {'JUMBO': '#22c55e', 'EXITO': '#eab308'}
         return mark_safe(f'<span style="color: {colores.get(obj.plantilla, "#94a3b8")}; font-weight: 500;">{nombre}</span>')
     plantilla_badge.short_description = 'Plantilla'

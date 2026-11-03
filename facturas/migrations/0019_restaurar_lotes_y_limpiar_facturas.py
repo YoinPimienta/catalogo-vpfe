@@ -1,6 +1,12 @@
 from django.db import migrations
 from decimal import Decimal
 import datetime
+import hashlib
+import uuid
+
+def generar_cufe_migracion(prefijo, fol):
+    raw = f"{prefijo}-{fol}-{uuid.uuid4()}"
+    return hashlib.sha384(raw.encode()).hexdigest()
 
 def restaurar_datos(apps, schema_editor):
     Factura = apps.get_model('facturas', 'Factura')
@@ -14,6 +20,7 @@ def restaurar_datos(apps, schema_editor):
     f_jumbo = Factura.objects.filter(emisor_nombre__icontains='CENCOSUD', lote_generacion__isnull=True).order_by('id').first()
     if not f_jumbo:
         f_jumbo = Factura.objects.create(
+            cufe=generar_cufe_migracion("AU06", "3425555"),
             plantilla='JUMBO',
             serie="AU06",
             folio="3425555",
@@ -38,7 +45,7 @@ def restaurar_datos(apps, schema_editor):
             rete_fuente=Decimal('0.00'),
             rete_iva=Decimal('0.00'),
             estado='Aceptada',
-            notas_finales='GRAN CONTRIBUYENTE SEGÚN RESOLUCION DIAN No.000200 DE DICIEMBRE 27 DE 2024'
+            notas_finales='GRAN CONTRIBUYENTE SEGUN RESOLUCION DIAN No.000200 DE DICIEMBRE 27 DE 2024'
         )
         Producto.objects.create(
             factura=f_jumbo,
@@ -53,6 +60,7 @@ def restaurar_datos(apps, schema_editor):
     f_exito = Factura.objects.filter(emisor_nombre__icontains='EXITO', lote_generacion__isnull=True).order_by('id').first()
     if not f_exito:
         f_exito = Factura.objects.create(
+            cufe=generar_cufe_migracion("WJ53", "44660"),
             plantilla='EXITO',
             serie="WJ53",
             folio="44660",
@@ -94,6 +102,7 @@ def restaurar_datos(apps, schema_editor):
     f_frisby = Factura.objects.filter(emisor_nombre__icontains='FRISBY', lote_generacion__isnull=True).order_by('id').first()
     if not f_frisby:
         f_frisby = Factura.objects.create(
+            cufe=generar_cufe_migracion("I041", "15129088"),
             plantilla='OTRA',
             serie='I041',
             folio='15129088',
@@ -144,6 +153,7 @@ def restaurar_datos(apps, schema_editor):
         for i in range(3):
             fol = str(3425558 + i)
             Factura.objects.create(
+                cufe=generar_cufe_migracion("AU06", fol),
                 plantilla='JUMBO',
                 lote_generacion=lote1,
                 serie='AU06',
@@ -187,6 +197,7 @@ def restaurar_datos(apps, schema_editor):
         for i in range(3):
             fol = str(44661 + i)
             Factura.objects.create(
+                cufe=generar_cufe_migracion("WJ53", fol),
                 plantilla='EXITO',
                 lote_generacion=lote2,
                 serie='WJ53',

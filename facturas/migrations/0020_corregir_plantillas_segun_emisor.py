@@ -1,15 +1,23 @@
 from django.db import migrations
+import unicodedata
+
+def quitar_tildes(texto):
+    if not texto:
+        return ""
+    return ''.join(c for c in unicodedata.normalize('NFD', str(texto)) if unicodedata.category(c) != 'Mn').upper()
 
 def corregir_plantillas(apps, schema_editor):
     Factura = apps.get_model('facturas', 'Factura')
     for f in Factura.objects.all():
-        em = (f.emisor_nombre or '').upper()
+        em = quitar_tildes(f.emisor_nombre or '')
         nit = (f.emisor_nit or '').replace('.', '').replace('-', '').strip()
-        if 'EXITO' in em or 'ÉXITO' in em or '890900608' in nit:
+        serie = (f.serie or '').upper()
+
+        if 'EXITO' in em or '890900608' in nit or 'WJ53' in serie:
             if f.plantilla != 'EXITO':
                 f.plantilla = 'EXITO'
                 f.save(update_fields=['plantilla'])
-        elif 'CENCOSUD' in em or 'JUMBO' in em or '900155107' in nit:
+        elif 'CENCOSUD' in em or 'JUMBO' in em or '900155107' in nit or 'AU06' in serie:
             if f.plantilla != 'JUMBO':
                 f.plantilla = 'JUMBO'
                 f.save(update_fields=['plantilla'])

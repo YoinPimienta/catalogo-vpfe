@@ -2,11 +2,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const emisorNombreInput = document.getElementById('id_emisor_nombre');
     const plantillaInput = document.getElementById('id_plantilla');
     const serieInput = document.getElementById('id_serie');
+    const nitInput = document.getElementById('id_emisor_nit');
+
+    function normalizar(texto) {
+        if (!texto) return '';
+        return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    }
 
     function sincronizarPlantillaSegunNombre(nombre) {
         if (!nombre || !plantillaInput) return;
-        const norm = nombre.toUpperCase();
-        if (norm.includes('EXITO') || norm.includes('ÉXITO')) {
+        const norm = normalizar(nombre);
+        if (norm.includes('EXITO')) {
             plantillaInput.value = 'EXITO';
             if (serieInput && (!serieInput.value || serieInput.value === 'AU06' || serieInput.value === 'I041')) {
                 serieInput.value = 'WJ53';
@@ -46,8 +52,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (data.plantilla && plantillaInput) {
                                 plantillaInput.value = data.plantilla;
                             }
-                            if (!document.getElementById('id_emisor_nit').value) {
-                                document.getElementById('id_emisor_nit').value = data.emisor_nit || '';
+                            if (nitInput && !nitInput.value) {
+                                nitInput.value = data.emisor_nit || '';
                             }
                             
                             const fields = [
@@ -75,16 +81,30 @@ document.addEventListener('DOMContentLoaded', function() {
         plantillaInput.addEventListener('change', function() {
             const val = this.value;
             if (val === 'EXITO') {
-                if (emisorNombreInput && (!emisorNombreInput.value || emisorNombreInput.value.includes('CENCOSUD') || emisorNombreInput.value.includes('JUMBO'))) {
-                    emisorNombreInput.value = 'ALMACENES ÉXITO SA';
-                    if (document.getElementById('id_emisor_nit')) document.getElementById('id_emisor_nit').value = '8909006089';
-                    if (serieInput && (!serieInput.value || serieInput.value === 'AU06' || serieInput.value === 'I041')) serieInput.value = 'WJ53';
+                if (emisorNombreInput) {
+                    const norm = normalizar(emisorNombreInput.value);
+                    if (!norm || norm.includes('CENCOSUD') || norm.includes('JUMBO')) {
+                        emisorNombreInput.value = 'ALMACENES EXITO S.A';
+                    }
+                }
+                if (nitInput && (!nitInput.value || nitInput.value.includes('900.155'))) {
+                    nitInput.value = '8909006089';
+                }
+                if (serieInput && (!serieInput.value || serieInput.value === 'AU06' || serieInput.value === 'I041')) {
+                    serieInput.value = 'WJ53';
                 }
             } else if (val === 'JUMBO') {
-                if (emisorNombreInput && (!emisorNombreInput.value || emisorNombreInput.value.includes('ÉXITO') || emisorNombreInput.value.includes('EXITO'))) {
-                    emisorNombreInput.value = 'CENCOSUD COLOMBIA S.A';
-                    if (document.getElementById('id_emisor_nit')) document.getElementById('id_emisor_nit').value = '900.155.107-1';
-                    if (serieInput && (!serieInput.value || serieInput.value === 'WJ53' || serieInput.value === 'I041')) serieInput.value = 'AU06';
+                if (emisorNombreInput) {
+                    const norm = normalizar(emisorNombreInput.value);
+                    if (!norm || norm.includes('EXITO')) {
+                        emisorNombreInput.value = 'CENCOSUD COLOMBIA S.A';
+                    }
+                }
+                if (nitInput && (!nitInput.value || nitInput.value.includes('890900608'))) {
+                    nitInput.value = '900.155.107-1';
+                }
+                if (serieInput && (!serieInput.value || serieInput.value === 'WJ53' || serieInput.value === 'I041')) {
+                    serieInput.value = 'AU06';
                 }
             }
         });
