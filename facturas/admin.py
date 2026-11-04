@@ -906,7 +906,9 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "factura_base":
-            kwargs["initial"] = Factura.objects.filter(lote_generacion__isnull=True).order_by('id').first()
+            base_jumbo = Factura.objects.filter(plantilla='JUMBO', lote_generacion__isnull=True).first() or                          Factura.objects.filter(plantilla='JUMBO').first()
+            if base_jumbo:
+                kwargs["initial"] = base_jumbo
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def save_model(self, request, obj, form, change):
@@ -919,20 +921,53 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
             if not obj.plantilla:
                 obj.plantilla = 'JUMBO'
 
-            # Sincronizar plantilla DESDE la factura_base (la base manda, no el campo plantilla)
-            # Si hay factura_guia adjunta, NO reasignar factura_base (el archivo define la plantilla en runtime)
+            # La plantilla seleccionada por el usuario en el lote es soberana
             tiene_guia = bool(getattr(obj, 'factura_guia', None) and obj.factura_guia.name)
-            if obj.factura_base:
-                # La plantilla del lote debe coincidir con la de la factura_base
-                if obj.factura_base.plantilla and obj.factura_base.plantilla != obj.plantilla:
-                    obj.plantilla = obj.factura_base.plantilla
-            elif not tiene_guia:
-                # Si no hay base ni guia, buscar la base que coincida con la plantilla seleccionada
-                obj.factura_base = (
-                    Factura.objects.filter(plantilla=obj.plantilla, lote_generacion__isnull=True).first()
-                    or Factura.objects.filter(plantilla=obj.plantilla).first()
-                    or Factura.objects.order_by('-id').first()
+            guia_name = obj.factura_guia.name.upper() if tiene_guia else ''
+            
+            if 'EXITO' in guia_name or (obj.serie and obj.serie.upper().startswith('WJ')):
+                obj.plantilla = 'EXITO'
+            elif 'JUMBO' in guia_name or 'CENCOSUD' in guia_name or (obj.serie and obj.serie.upper().startswith('AU')):
+                obj.plantilla = 'JUMBO'
+            
+            # Garantizar que factura_base sea 100% compatible con obj.plantilla
+            if not obj.factura_base or obj.factura_base.plantilla != obj.plantilla or 'FRISBY' in (obj.factura_base.emisor_nombre or '').upper():
+                base_compatible = (
+                    Factura.objects.filter(plantilla=obj.plantilla, lote_generacion__isnull=True).exclude(emisor_nombre__icontains='FRISBY').first()
+                    or Factura.objects.filter(plantilla=obj.plantilla).exclude(emisor_nombre__icontains='FRISBY').first()
                 )
+                if not base_compatible:
+                    # Crear factura base garantizada si no existe en la base de datos
+                    from decimal import Decimal
+                    if obj.plantilla == 'EXITO':
+                        base_compatible = Factura.objects.create(
+                            plantilla='EXITO',
+                            serie='WJ53',
+                            folio='44660',
+                            emisor_nombre='ALMACENES EXITO S.A',
+                            emisor_nit='8909006089',
+                            emisor_direccion='CRA 48 # 32B SUR 139',
+                            emisor_telefono='6043396565',
+                            emisor_correo='facturacion@exito.com',
+                            subtotal=Decimal('8826220.00'),
+                            iva=Decimal('1676982.00'),
+                            total=Decimal('10503202.00'),
+                        )
+                    else:
+                        base_compatible = Factura.objects.create(
+                            plantilla='JUMBO',
+                            serie='AU06',
+                            folio='3425557',
+                            emisor_nombre='CENCOSUD COLOMBIA S.A',
+                            emisor_nit='900.155.107-1',
+                            emisor_direccion='AV EL POBLADO CRA 43A',
+                            emisor_telefono='6045013012',
+                            emisor_correo='facturacion@cencosud.com.co',
+                            subtotal=Decimal('36680.67'),
+                            iva=Decimal('6969.33'),
+                            total=Decimal('43650.00'),
+                        )
+                obj.factura_base = base_compatible
 
             if not obj.fecha_inicio:
                 obj.fecha_inicio = timezone.localdate()

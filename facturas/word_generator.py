@@ -456,27 +456,26 @@ def rellenar_plantilla_jumbo(doc_path, factura):
     except Exception as e:
         print(f"Aviso al inyectar codigo de barras Jumbo: {e}")
 
-    # Reemplazo de CUFE y FACTURADOR con limpieza agresiva de residuos y fuente Calibri 8pt
+    # Reemplazo de CUFE y FACTURADOR con eliminacion limpia de nodos XML para no dejar saltos ni espacios extra
+    parrafos_a_remover_jumbo = []
     for idx_p, p in enumerate(doc.paragraphs):
         p_text = p.text.strip()
         if p_text in ('CUFE :', 'CUFE : ', 'CUFE:'):
-            # El parrafo siguiente es el CUFE superior
             if idx_p + 1 < len(doc.paragraphs):
                 p_cufe = doc.paragraphs[idx_p + 1]
                 p_cufe.text = cufe
                 for r in p_cufe.runs:
                     _forzar_fuente_8pt(r)
-            # Si hay parrafos residuales antes del QR, vaciarlos
+            # Marcar parrafos residuales antes del QR para removerlos del XML
             for sub_i in range(idx_p + 2, min(idx_p + 5, len(doc.paragraphs))):
                 p_sub = doc.paragraphs[sub_i]
                 if 'drawing' in p_sub._p.xml or 'graphic' in p_sub._p.xml or 'FACTURADOR' in p_sub.text:
                     break
-                p_sub.text = ""
+                parrafos_a_remover_jumbo.append(p_sub)
         elif 'FACTURADOR' in p_text and ('CUFE' in p_text or ':' in p_text):
             p.text = f"  FACTURADOR  :  {serie}- {folio}   - CUFE "
             for r in p.runs:
                 _forzar_fuente_8pt(r)
-            # Los siguientes parrafos: el primero tendra el CUFE y los demas se VACIAN
             p_cufe_colocado = False
             for next_idx in range(idx_p + 1, min(idx_p + 7, len(doc.paragraphs))):
                 p_next = doc.paragraphs[next_idx]
@@ -489,8 +488,14 @@ def rellenar_plantilla_jumbo(doc_path, factura):
                         _forzar_fuente_8pt(r)
                     p_cufe_colocado = True
                 else:
-                    # Vaciar cualquier residuo del CUFE viejo (como q7e8f9ik..., ac994..., etc.)
-                    p_next.text = ""
+                    # Remover linea residual del CUFE viejo para no dejar lineas en blanco
+                    parrafos_a_remover_jumbo.append(p_next)
+
+    for p_del in parrafos_a_remover_jumbo:
+        try:
+            p_del._element.getparent().remove(p_del._element)
+        except Exception:
+            p_del.text = ""
 
     if len(doc.paragraphs) > 52:
         p52 = doc.paragraphs[52]
@@ -805,19 +810,22 @@ def rellenar_factura_guia_estatica(doc_path, factura):
     for idx, p in enumerate(doc.paragraphs):
         p_text = p.text
 
-        # CUFE y FACTURADOR con limpieza completa de residuos
+        # CUFE y FACTURADOR con eliminacion limpia sin espacios residuales
         if p_text.strip() in ('CUFE :', 'CUFE : ', 'CUFE:'):
             if idx + 1 < total_paragraphs:
                 p_next = doc.paragraphs[idx + 1]
                 p_next.text = cufe
                 for r in p_next.runs:
                     _forzar_fuente_8pt(r)
-            # Vaciar lineas residuales del CUFE antes del QR
+            # Remover lineas residuales del CUFE antes del QR del XML
             for sub_i in range(idx + 2, min(idx + 5, total_paragraphs)):
                 p_sub = doc.paragraphs[sub_i]
                 if 'drawing' in p_sub._p.xml or 'graphic' in p_sub._p.xml or 'FACTURADOR' in p_sub.text:
                     break
-                p_sub.text = ""
+                try:
+                    p_sub._element.getparent().remove(p_sub._element)
+                except Exception:
+                    p_sub.text = ""
             continue
         elif 'FACTURADOR' in p_text and ('CUFE' in p_text or ':' in p_text):
             p.text = f"  FACTURADOR  :  {serie}- {folio}   - CUFE "
@@ -835,7 +843,10 @@ def rellenar_factura_guia_estatica(doc_path, factura):
                         _forzar_fuente_8pt(r)
                     p_cufe_colocado = True
                 else:
-                    p_next.text = ""
+                    try:
+                        p_next._element.getparent().remove(p_next._element)
+                    except Exception:
+                        p_next.text = ""
             continue
         elif re.match(r'^[0-9a-zA-Z\s]{25,120}$', p_text.strip()) and any(k in doc.paragraphs[max(0, idx-2)].text for k in ('CUFE', 'FACTURADOR', 'Cufe')):
             p.text = ""
@@ -1288,9 +1299,9 @@ def generar_lote_word_unificado_bytes(lote):
 
     otras_facturas = [f for f in facturas if f.id != factura_primera.id]
     
-    # Cap de seguridad de hasta 40 facturas para el Word unificado
-    if len(otras_facturas) > 40:
-        otras_facturas = otras_facturas[:40]
+    # Cap de seguridad ampliado a 100 facturas para el Word unificado (cubre pedidos de 50 facturas)
+    if len(otras_facturas) > 100:
+        otras_facturas = otras_facturas[:100]
 
     if otras_facturas:
         try:
@@ -1298,8 +1309,8 @@ def generar_lote_word_unificado_bytes(lote):
             composer = Composer(doc_base)
             t_start = time.time()
             for idx, f in enumerate(otras_facturas):
-                # Limite preventivo de 25 segundos para evitar WORKER TIMEOUT de Gunicorn
-                if time.time() - t_start > 25.0:
+                # Limite preventivo ampliado a 140 segundos (aprovecha timeout de 180s de Gunicorn)
+                if time.time() - t_start > 140.0:
                     print(f"Aviso: limite de tiempo alcanzado al componer lote #{lote.id} ({idx+1} facturas unificadas)")
                     break
                 try:
@@ -1349,8 +1360,8 @@ def generar_lote_zip_bytes(lote):
             if (idx + 1) % 10 == 0:
                 gc.collect()
 
-        # 2. Documento unificado protegido
-        if len(facturas) <= 30:
+        # 2. Documento unificado protegido (soporta hasta 100 facturas en lote)
+        if len(facturas) <= 100:
             try:
                 unificado_stream = generar_lote_word_unificado_bytes(lote)
                 unificado_filename = f"Lote_{lote.id}_Facturas_Unificadas_{lote.factura_base.serie if lote.factura_base else 'POS'}.docx"

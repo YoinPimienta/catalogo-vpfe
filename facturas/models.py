@@ -38,8 +38,8 @@ class Factura(models.Model):
 
     # Identificación
     cufe = models.CharField(max_length=150, unique=True, blank=True, help_text="Se autogenerará si se deja en blanco.")
-    serie = models.CharField(max_length=20, default="I041")
-    folio = models.CharField(max_length=20, default="15129088")
+    serie = models.CharField(max_length=20, default="AU06")
+    folio = models.CharField(max_length=20, default="3425557")
     fecha_emision = models.DateField(default=obtener_fecha_actual_colombia, verbose_name="Fecha de Emisión")
     hora_emision = models.TimeField(default=obtener_hora_actual_colombia, null=True, blank=True, verbose_name="Hora de Emisión")
     fecha_vencimiento = models.DateField(null=True, blank=True, verbose_name="Fecha de Vencimiento")
@@ -55,17 +55,17 @@ class Factura(models.Model):
     fecha_orden_pedido = models.DateField(null=True, blank=True)
 
     # Emisor
-    emisor_nombre = models.CharField(max_length=200, default="FRISBY S.A. BIC")
-    emisor_nit = models.CharField(max_length=50, default="891408584")
+    emisor_nombre = models.CharField(max_length=200, default="CENCOSUD COLOMBIA S.A")
+    emisor_nit = models.CharField(max_length=50, default="900.155.107-1")
     emisor_tipo_contribuyente = models.CharField(max_length=100, default="Persona Jurídica")
     emisor_regimen_fiscal = models.CharField(max_length=100, default="O-13;O-23")
     emisor_responsabilidad_tributaria = models.CharField(max_length=100, default="01 - IVA")
     emisor_pais = models.CharField(max_length=100, default="Colombia")
     emisor_departamento = models.CharField(max_length=100, default="No Especificado")
     emisor_municipio = models.CharField(max_length=100, default="No Especificado")
-    emisor_direccion = models.CharField(max_length=255, default="No Registrada")
-    emisor_telefono = models.CharField(max_length=50, default="0000000000")
-    emisor_correo = models.CharField(max_length=150, default="facturacion@empresa.com")
+    emisor_direccion = models.CharField(max_length=255, default="AV EL POBLADO CRA 43A")
+    emisor_telefono = models.CharField(max_length=50, default="6045013012")
+    emisor_correo = models.CharField(max_length=150, default="facturacion@cencosud.com.co")
     
     # Receptor
     receptor_nombre = models.CharField(max_length=200, default="Dany Arturo Quintero Rojas")
@@ -97,16 +97,16 @@ class Factura(models.Model):
     # Totales y Valores extra (Manuales y Automáticos)
     estado = models.CharField(max_length=100, choices=ESTADOS, default='Aceptada')
     moneda = models.CharField(max_length=10, default="COP")
-    subtotal = models.DecimalField(max_digits=15, decimal_places=2, default=0) # Automatico (Total Bruto)
-    descuento_detalle_total = models.DecimalField(max_digits=15, decimal_places=2, default=0) # Automatico
-    iva = models.DecimalField(max_digits=15, decimal_places=2, default=0) # Automatico
-    inc_total = models.DecimalField(max_digits=15, decimal_places=2, default=0) # Automatico
+    subtotal = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal("36680.67")) # Automatico (Total Bruto)
+    descuento_detalle_total = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal("43650.00")) # Automatico
+    iva = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal("6969.33")) # Automatico
+    inc_total = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal("43650.00")) # Automatico
     otros_impuestos = models.DecimalField(max_digits=15, decimal_places=2, default=0) # Manual
     total_impuesto = models.DecimalField(max_digits=15, decimal_places=2, default=0) # Automatico
     total_neto = models.DecimalField(max_digits=15, decimal_places=2, default=0) # Automatico
     descuento_global = models.DecimalField(max_digits=15, decimal_places=2, default=0) # Manual
     recargo_global = models.DecimalField(max_digits=15, decimal_places=2, default=0) # Manual
-    total = models.DecimalField(max_digits=15, decimal_places=2, default=0) # Automatico
+    total = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal("43650.00")) # Automatico
     
     anticipos = models.DecimalField(max_digits=15, decimal_places=2, default=0) # Manual
     rete_fuente = models.DecimalField(max_digits=15, decimal_places=2, default=0) # Manual
@@ -134,6 +134,20 @@ class Factura(models.Model):
             self.plantilla = 'EXITO'
         elif ('CENCOSUD' in em_norm or 'JUMBO' in em_norm or '900155107' in nit_norm or 'AU06' in serie_norm) and self.plantilla != 'JUMBO':
             self.plantilla = 'JUMBO'
+
+        # Blindaje de emisor segun plantilla seleccionada
+        if self.plantilla == 'JUMBO':
+            if not self.emisor_nombre or 'FRISBY' in em_norm or 'EXITO' in em_norm:
+                self.emisor_nombre = 'CENCOSUD COLOMBIA S.A'
+                self.emisor_nit = '900.155.107-1'
+                if not self.serie or self.serie in ('I041', 'WJ53'):
+                    self.serie = 'AU06'
+        elif self.plantilla == 'EXITO':
+            if not self.emisor_nombre or 'FRISBY' in em_norm or 'CENCOSUD' in em_norm or 'JUMBO' in em_norm:
+                self.emisor_nombre = 'ALMACENES EXITO S.A'
+                self.emisor_nit = '8909006089'
+                if not self.serie or self.serie in ('I041', 'AU06'):
+                    self.serie = 'WJ53'
 
         if not self.hora_emision:
             self.hora_emision = obtener_hora_actual_colombia()

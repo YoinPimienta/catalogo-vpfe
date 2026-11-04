@@ -9,6 +9,38 @@ document.addEventListener('DOMContentLoaded', function() {
         return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
     }
 
+    function aplicarDatosPlantilla(plantillaVal) {
+        if (!plantillaVal) return;
+        const val = plantillaVal.toUpperCase();
+        if (val === 'EXITO') {
+            if (emisorNombreInput) {
+                const norm = normalizar(emisorNombreInput.value);
+                if (!norm || norm.includes('FRISBY') || norm.includes('CENCOSUD') || norm.includes('JUMBO')) {
+                    emisorNombreInput.value = 'ALMACENES EXITO S.A';
+                }
+            }
+            if (nitInput && (!nitInput.value || nitInput.value.includes('900.155') || nitInput.value.includes('891408'))) {
+                nitInput.value = '8909006089';
+            }
+            if (serieInput && (!serieInput.value || serieInput.value === 'AU06' || serieInput.value === 'I041')) {
+                serieInput.value = 'WJ53';
+            }
+        } else if (val === 'JUMBO') {
+            if (emisorNombreInput) {
+                const norm = normalizar(emisorNombreInput.value);
+                if (!norm || norm.includes('FRISBY') || norm.includes('EXITO')) {
+                    emisorNombreInput.value = 'CENCOSUD COLOMBIA S.A';
+                }
+            }
+            if (nitInput && (!nitInput.value || nitInput.value.includes('890900608') || nitInput.value.includes('891408'))) {
+                nitInput.value = '900.155.107-1';
+            }
+            if (serieInput && (!serieInput.value || serieInput.value === 'WJ53' || serieInput.value === 'I041')) {
+                serieInput.value = 'AU06';
+            }
+        }
+    }
+
     function sincronizarPlantillaSegunNombre(nombre) {
         if (!nombre || !plantillaInput) return;
         const norm = normalizar(nombre);
@@ -23,6 +55,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 serieInput.value = 'AU06';
             }
         }
+    }
+
+    // Al cargar la pagina, sincronizar inmediatamente si hay plantilla asignada
+    if (plantillaInput) {
+        aplicarDatosPlantilla(plantillaInput.value);
+        plantillaInput.addEventListener('change', function() {
+            aplicarDatosPlantilla(this.value);
+        });
     }
 
     if (emisorNombreInput) {
@@ -73,39 +113,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         loadingSpan.style.display = 'none';
                         console.error("Error fetching emisor data:", error);
                     });
-            }
-        });
-    }
-
-    if (plantillaInput) {
-        plantillaInput.addEventListener('change', function() {
-            const val = this.value;
-            if (val === 'EXITO') {
-                if (emisorNombreInput) {
-                    const norm = normalizar(emisorNombreInput.value);
-                    if (!norm || norm.includes('CENCOSUD') || norm.includes('JUMBO')) {
-                        emisorNombreInput.value = 'ALMACENES EXITO S.A';
-                    }
-                }
-                if (nitInput && (!nitInput.value || nitInput.value.includes('900.155'))) {
-                    nitInput.value = '8909006089';
-                }
-                if (serieInput && (!serieInput.value || serieInput.value === 'AU06' || serieInput.value === 'I041')) {
-                    serieInput.value = 'WJ53';
-                }
-            } else if (val === 'JUMBO') {
-                if (emisorNombreInput) {
-                    const norm = normalizar(emisorNombreInput.value);
-                    if (!norm || norm.includes('EXITO')) {
-                        emisorNombreInput.value = 'CENCOSUD COLOMBIA S.A';
-                    }
-                }
-                if (nitInput && (!nitInput.value || nitInput.value.includes('890900608'))) {
-                    nitInput.value = '900.155.107-1';
-                }
-                if (serieInput && (!serieInput.value || serieInput.value === 'WJ53' || serieInput.value === 'I041')) {
-                    serieInput.value = 'AU06';
-                }
             }
         });
     }
