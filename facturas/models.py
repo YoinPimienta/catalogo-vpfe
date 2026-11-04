@@ -274,7 +274,8 @@ class LoteGeneracionFacturas(models.Model):
         null=True,
         blank=True,
         related_name='lotes_como_base',
-        verbose_name="Factura Base"
+        verbose_name="Factura Base",
+        limit_choices_to={'lote_generacion__isnull': True}
     )
     serie = models.CharField(
         max_length=20, 

@@ -906,7 +906,9 @@ class LoteGeneracionFacturasAdmin(admin.ModelAdmin):
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "factura_base":
-            base_jumbo = Factura.objects.filter(plantilla='JUMBO', lote_generacion__isnull=True).first() or                          Factura.objects.filter(plantilla='JUMBO').first()
+            # Filtrar estrictamente solo facturas base (que no pertenezcan a lotes)
+            kwargs["queryset"] = Factura.objects.filter(lote_generacion__isnull=True).order_by('id')
+            base_jumbo = Factura.objects.filter(plantilla='JUMBO', lote_generacion__isnull=True).first()
             if base_jumbo:
                 kwargs["initial"] = base_jumbo
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
