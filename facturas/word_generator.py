@@ -1,3 +1,4 @@
+import random
 import jinja2
 from PIL import Image
 import os
@@ -1196,6 +1197,142 @@ def plantilla_tiene_jinja(doc_path):
     except Exception:
         return False
 
+
+
+def extraer_datos_de_factura_guia_docx(doc_path):
+    """
+    Lee una factura modelo (.docx) adjunta por el cliente y extrae de forma inteligente:
+    - Lista de productos con codigo, nombre, cantidad, valor unitario y total
+    - Totales: total, subtotal, iva
+    Permite que facturas personalizadas se reflejen 100% fieles en la base de datos y DIAN.
+    """
+    if not doc_path or not os.path.exists(doc_path):
+        return {'productos': [], 'total': None, 'subtotal': None, 'iva': None}
+
+    try:
+        doc = docx.Document(doc_path)
+    except Exception as e:
+        print(f"Aviso: no se pudo abrir {doc_path} para extraer datos: {e}")
+        return {'productos': [], 'total': None, 'subtotal': None, 'iva': None}
+
+    textos = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+    
+    total = None
+    subtotal = None
+    iva = None
+    
+    for t in textos:
+        t_up = t.upper()
+        if t_up.startswith('VALOR TOTAL') or t_up.startswith('TOTAL :') or t_up.startswith('TOTAL:'):
+            m = re.search(r'([\d\.,]{3,})', t[11:])
+            if m and total is None:
+                total = limpiar_monto_colombiano(m.group(1))
+        elif 'SUBTOTAL/TOTAL' in t_up:
+            m = re.search(r'([\d\.,]{3,})', t)
+            if m and total is None:
+                total = limpiar_monto_colombiano(m.group(1))
+        elif t_up.startswith('TOTAL') and not t_up.startswith('TOTAL ITEM') and total is None:
+            m = re.search(r'([\d\.,]{3,})', t[5:])
+            if m:
+                total = limpiar_monto_colombiano(m.group(1))
+        
+        if t_up.startswith('SUBTOTAL') and 'SUBTOTAL/TOTAL' not in t_up:
+            m = re.search(r'([\d\.,]{3,})', t[8:])
+            if m and subtotal is None:
+                subtotal = limpiar_monto_colombiano(m.group(1))
+        
+        if 'A-IVA=' in t_up:
+            partes = re.findall(r'[\d\.,]{3,}', t)
+            if len(partes) >= 3:
+                if total is None:
+                    total = limpiar_monto_colombiano(partes[0])
+                if subtotal is None:
+                    subtotal = limpiar_monto_colombiano(partes[1])
+                if iva is None:
+                    iva = limpiar_monto_colombiano(partes[2])
+        elif 'N=19%' in t_up or 'IVA=' in t_up:
+            partes = re.findall(r'[\d\.,]{3,}', t)
+            if len(partes) >= 2:
+                if subtotal is None:
+                    subtotal = limpiar_monto_colombiano(partes[0])
+                if iva is None:
+                    iva = limpiar_monto_colombiano(partes[1])
+
+    productos = []
+    # 1. Buscar formato Exito: PLU DETALLE PRECIO ... Total Item
+    idx_plu = None
+    idx_total_item = None
+    for idx, p in enumerate(doc.paragraphs):
+        txt = p.text.upper()
+        if 'PLU' in txt and 'DETALLE' in txt:
+            idx_plu = idx
+        elif 'TOTAL ITEM' in txt and idx_plu is not None:
+            idx_total_item = idx
+            break
+            
+    if idx_plu is not None and idx_total_item is not None:
+        p_lines = [doc.paragraphs[k].text.strip() for k in range(idx_plu + 1, idx_total_item) if doc.paragraphs[k].text.strip()]
+        i = 0
+        while i < len(p_lines):
+            l = p_lines[i]
+            m_header = re.match(r'^\d+\s+(\d+)/u\s+[xX]\s*([\$\d\.,]+)', l)
+            if m_header:
+                cant = int(m_header.group(1))
+                precio = limpiar_monto_colombiano(m_header.group(2))
+                i += 1
+                desc_parts = []
+                while i < len(p_lines) and not re.match(r'^\d+\s+\d+/u', p_lines[i]):
+                    desc_parts.append(p_lines[i])
+                    i += 1
+                desc_full = ' '.join(desc_parts)
+                m_cod = re.match(r'^(\d{5,10})\s+(.*)', desc_full)
+                if m_cod:
+                    cod = m_cod.group(1)
+                    nom = re.sub(r'[\$\d\.,]+[A-Za-z]?\s*$', '', m_cod.group(2)).strip()
+                else:
+                    cod = "3100827"
+                    nom = re.sub(r'[\$\d\.,]+[A-Za-z]?\s*$', '', desc_full).strip()
+                productos.append({
+                    'codigo': cod,
+                    'nombre': nom or 'Producto',
+                    'cantidad': cant,
+                    'valor_unitario': precio,
+                    'total_linea': precio * cant
+                })
+            else:
+                i += 1
+
+    # 2. Buscar formato Jumbo si no hubo Exito
+    if not productos:
+        for idx, p in enumerate(doc.paragraphs):
+            txt = p.text.strip()
+            m_jumbo = re.match(r'^(\d+)\s+[xX]\s*([\$\d\.,]+)', txt)
+            if m_jumbo and idx + 1 < len(doc.paragraphs):
+                cant = int(m_jumbo.group(1))
+                precio = limpiar_monto_colombiano(m_jumbo.group(2))
+                next_txt = doc.paragraphs[idx + 1].text.strip()
+                m_next = re.match(r'^(\d+)\s+(.*?)(?:\s+\$([\d\.,]+))?$', next_txt)
+                if m_next:
+                    cod = m_next.group(1)
+                    nom = m_next.group(2).strip()
+                else:
+                    cod = "3669368"
+                    nom = next_txt
+                productos.append({
+                    'codigo': cod,
+                    'nombre': nom,
+                    'cantidad': cant,
+                    'valor_unitario': precio,
+                    'total_linea': precio * cant
+                })
+
+    return {
+        'productos': productos,
+        'total': total,
+        'subtotal': subtotal,
+        'iva': iva
+    }
+
 def generar_documento_factura(factura, template_path=None):
     """
     Genera y retorna un docx.Document listo para una factura individual.
@@ -1220,13 +1357,9 @@ def generar_documento_factura(factura, template_path=None):
     if factura.lote_generacion and factura.lote_generacion.factura_guia and os.path.exists(factura.lote_generacion.factura_guia.path):
         if plantilla_tiene_jinja(tpl_path):
             return render_jinja_documento(tpl_path, factura)
-        guia_lower = os.path.basename(tpl_path).lower()
-        if 'jumbo' in guia_lower or 'cencosud' in guia_lower or (factura.serie and factura.serie.startswith('AU')):
-            return rellenar_plantilla_jumbo(tpl_path, factura)
-        elif 'exito' in guia_lower or (factura.serie and factura.serie.startswith('WJ')):
-            return rellenar_plantilla_exito(tpl_path, factura)
-        else:
-            return rellenar_factura_guia_estatica(tpl_path, factura)
+        # Respetar 100% los productos y diseno organizados por el cliente en su archivo modelo .docx
+        # rellenar_factura_guia_estatica preserva los productos exactos y solo actualiza folio, serie, CUFE, QR, barcode, fecha y hora
+        return rellenar_factura_guia_estatica(tpl_path, factura)
 
     # 2. Plantilla JUMBO
     if plantilla_tipo == 'JUMBO' or 'jumbo' in filename_lower:

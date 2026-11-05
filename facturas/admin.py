@@ -1,3 +1,4 @@
+import os
 from django.contrib import admin
 from decimal import Decimal
 from .models import Factura, Producto, LoteGeneracionFacturas
@@ -280,6 +281,16 @@ def ejecutar_generacion_masiva_para_lote(lote, usuario=None, serie_custom=None, 
         em_nombre = 'CENCOSUD COLOMBIA S.A'
         em_nit = '900.155.107-1'
 
+    # Extraer productos y totales del archivo modelo .docx si fue adjuntado por el cliente
+    datos_guia = None
+    if lote and getattr(lote, 'factura_guia', None) and lote.factura_guia.name:
+        try:
+            if os.path.exists(lote.factura_guia.path):
+                from .word_generator import extraer_datos_de_factura_guia_docx
+                datos_guia = extraer_datos_de_factura_guia_docx(lote.factura_guia.path)
+        except Exception as e:
+            print(f"Aviso al extraer datos de factura_guia: {e}")
+
     # Receptor del lote o de la base o por defecto
     rec_nombre = (getattr(lote, 'receptor_nombre', None) or '').strip()
     rec_nit = (getattr(lote, 'receptor_nit', None) or '').strip()
@@ -421,6 +432,28 @@ def ejecutar_generacion_masiva_para_lote(lote, usuario=None, serie_custom=None, 
                     impuesto_inc=Decimal('0'),
                     total_linea=p_info.get('total_linea', Decimal('0'))
                 )
+        elif datos_guia and datos_guia.get('productos'):
+            # Si el cliente adjunto una factura modelo (.docx), tomar sus productos y totales reales
+            for p_info in datos_guia['productos']:
+                Producto.objects.create(
+                    factura=copia_factura,
+                    codigo=p_info.get('codigo', ''),
+                    nombre=p_info.get('nombre', ''),
+                    unidad_medida="94",
+                    cantidad=p_info.get('cantidad', 1),
+                    valor_unitario=p_info.get('valor_unitario', Decimal('0')),
+                    precio_incluye_impuesto=True,
+                    descuento=Decimal('0'),
+                    impuesto=Decimal('0'),
+                    impuesto_inc=Decimal('0'),
+                    total_linea=p_info.get('total_linea', Decimal('0'))
+                )
+            if datos_guia.get('total'):
+                copia_factura.total = datos_guia['total']
+            if datos_guia.get('subtotal'):
+                copia_factura.subtotal = datos_guia['subtotal']
+            if datos_guia.get('iva'):
+                copia_factura.iva = datos_guia['iva']
         elif factura_base and factura_base.productos.exists():
             for producto_base in factura_base.productos.all():
                 Producto.objects.create(
