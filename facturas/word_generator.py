@@ -807,6 +807,7 @@ def rellenar_factura_guia_estatica(doc_path, factura):
         return False
 
     # 3. Reemplazo en parrafos
+    parrafos_a_remover = []
     total_paragraphs = len(doc.paragraphs)
     for idx, p in enumerate(doc.paragraphs):
         p_text = p.text
@@ -818,25 +819,22 @@ def rellenar_factura_guia_estatica(doc_path, factura):
                 p_next.text = cufe
                 for r in p_next.runs:
                     _forzar_fuente_8pt(r)
-            # Remover lineas residuales del CUFE antes del QR del XML
-            for sub_i in range(idx + 2, min(idx + 5, total_paragraphs)):
+            # Marcar lineas residuales del CUFE antes del QR del XML para remover
+            for sub_i in range(idx + 2, min(idx + 6, total_paragraphs)):
                 p_sub = doc.paragraphs[sub_i]
                 if 'drawing' in p_sub._p.xml or 'graphic' in p_sub._p.xml or 'FACTURADOR' in p_sub.text:
                     break
-                try:
-                    p_sub._element.getparent().remove(p_sub._element)
-                except Exception:
-                    p_sub.text = ""
+                parrafos_a_remover.append(p_sub)
             continue
         elif 'FACTURADOR' in p_text and ('CUFE' in p_text or ':' in p_text):
             p.text = f"  FACTURADOR  :  {serie}- {folio}   - CUFE "
             for r in p.runs:
                 _forzar_fuente_8pt(r)
             p_cufe_colocado = False
-            for next_idx in range(idx + 1, min(idx + 7, total_paragraphs)):
+            for next_idx in range(idx + 1, min(idx + 8, total_paragraphs)):
                 p_next = doc.paragraphs[next_idx]
                 txt_next = p_next.text.strip()
-                if '----' in txt_next or 'Cadena' in txt_next or 'RESOL' in txt_next or 'FAC.' in txt_next:
+                if any(k in txt_next for k in ('----', 'Cadena', 'RESOL', 'FAC.', 'VIGENCIA')):
                     break
                 if not p_cufe_colocado:
                     p_next.text = cufe
@@ -844,13 +842,10 @@ def rellenar_factura_guia_estatica(doc_path, factura):
                         _forzar_fuente_8pt(r)
                     p_cufe_colocado = True
                 else:
-                    try:
-                        p_next._element.getparent().remove(p_next._element)
-                    except Exception:
-                        p_next.text = ""
+                    parrafos_a_remover.append(p_next)
             continue
         elif re.match(r'^[0-9a-zA-Z\s]{25,120}$', p_text.strip()) and any(k in doc.paragraphs[max(0, idx-2)].text for k in ('CUFE', 'FACTURADOR', 'Cufe')):
-            p.text = ""
+            parrafos_a_remover.append(p)
             continue
 
         # Reemplazo de Folio y Serie
@@ -884,6 +879,12 @@ def rellenar_factura_guia_estatica(doc_path, factura):
             reemplazar_en_parrafo(p, r'ID:\s*\d{8}-', f"ID: {fecha_compact}-")
         elif 'NUTRX:' in p_text:
             reemplazar_en_parrafo(p, r'NUTRX:\d{8}', f"NUTRX:{fecha_compact}")
+
+    for p_del in parrafos_a_remover:
+        try:
+            p_del._element.getparent().remove(p_del._element)
+        except Exception:
+            p_del.text = ""
 
     # 4. Procesar tablas si las hay
     for t in doc.tables:
