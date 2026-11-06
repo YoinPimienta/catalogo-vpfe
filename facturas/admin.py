@@ -1,4 +1,5 @@
 import os
+import uuid
 from django.contrib import admin
 from decimal import Decimal
 from .models import Factura, Producto, LoteGeneracionFacturas
@@ -345,6 +346,7 @@ def ejecutar_generacion_masiva_para_lote(lote, usuario=None, serie_custom=None, 
 
         tr_calculado = str(base_tr + i + 1)
         rem_calculado = f"REM{base_rem + i + 1:05d}"
+        nuevo_cufe = str(uuid.uuid4()).replace('-', '') + str(uuid.uuid4()).replace('-', '')
 
         copia_factura = Factura(
             plantilla=plantilla_lote,
@@ -359,7 +361,7 @@ def ejecutar_generacion_masiva_para_lote(lote, usuario=None, serie_custom=None, 
             registro=getattr(factura_base, 'registro', '05') if factura_base else '05',
             transaccion=tr_calculado,
             rem=rem_calculado,
-            cufe="",
+            cufe=nuevo_cufe,
             qr_code="",
             tipo_operacion=getattr(factura_base, 'tipo_operacion', '10 - Estándar') if factura_base else '10 - Estándar',
             forma_pago=getattr(factura_base, 'forma_pago', '1 - Contado') if factura_base else '1 - Contado',
@@ -501,6 +503,8 @@ def ejecutar_generacion_masiva_para_lote(lote, usuario=None, serie_custom=None, 
                 )
 
         copia_factura.recalcular_totales()
+        if not copia_factura.qr_code:
+            copia_factura.generar_qr()
         copia_factura.save()
         facturas_creadas.append(copia_factura)
 

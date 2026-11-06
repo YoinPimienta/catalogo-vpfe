@@ -138,8 +138,25 @@ def previsualizar_tirilla(request, cufe):
 
     doc = generar_documento_factura(factura)
 
-    qr_rid = 'rId6' if plantilla_calc == 'EXITO' else 'rId8'
-    bc_rid = 'rId7' if plantilla_calc == 'EXITO' else 'rId9'
+    # Detectar dinámicamente rIds de QR y Barcode analizando las imágenes del documento
+    qr_rids = set()
+    bc_rids = set()
+    for rId, rel in doc.part.rels.items():
+        if 'image' in rel.target_ref or 'image' in getattr(rel.target_part, 'content_type', ''):
+            try:
+                img = Image.open(io.BytesIO(rel.target_part._blob))
+                ratio = img.width / float(img.height or 1)
+                if 0.75 <= ratio <= 1.3:
+                    qr_rids.add(rId)
+                elif ratio >= 2.0:
+                    bc_rids.add(rId)
+            except Exception:
+                pass
+
+    if not qr_rids:
+        qr_rids.add('rId6' if plantilla_calc == 'EXITO' else 'rId8')
+    if not bc_rids:
+        bc_rids.add('rId7' if plantilla_calc == 'EXITO' else 'rId9')
 
     import base64
     barcode_img_src = None
@@ -154,19 +171,21 @@ def previsualizar_tirilla(request, cufe):
         barcode_img_src = f"data:image/png;base64,{b64}"
     except Exception as ex:
         print(f"Aviso al generar barcode preview: {ex}")
-        if bc_rid in doc.part.rels:
-            try:
-                img_blob = doc.part.rels[bc_rid].target_part.blob
-                b64 = base64.b64encode(img_blob).decode('utf-8')
-                barcode_img_src = f"data:image/png;base64,{b64}"
-            except Exception:
-                barcode_img_src = None
+        for b_id in bc_rids:
+            if b_id in doc.part.rels:
+                try:
+                    img_blob = doc.part.rels[b_id].target_part._blob
+                    b64 = base64.b64encode(img_blob).decode('utf-8')
+                    barcode_img_src = f"data:image/png;base64,{b64}"
+                    break
+                except Exception:
+                    pass
 
     lineas_tirilla = []
     for p in doc.paragraphs:
         align = 'center' if p.alignment == 1 else ('right' if p.alignment == 2 else 'left')
-        has_qr = any(qr_rid in r._element.xml for r in p.runs)
-        has_bc = any(bc_rid in r._element.xml for r in p.runs)
+        has_qr = any(any(r_id in r._element.xml for r_id in qr_rids) for r in p.runs)
+        has_bc = any(any(r_id in r._element.xml for r_id in bc_rids) for r in p.runs)
 
         runs_data = []
         for r in p.runs:

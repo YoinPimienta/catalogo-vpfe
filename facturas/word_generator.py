@@ -12,7 +12,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.utils import timezone
 import docx
-from docx.shared import Mm, Pt
+from docx.shared import Mm, Pt, Inches
 from docx.enum.text import WD_COLOR_INDEX
 from docxtpl import DocxTemplate, InlineImage
 import qrcode
@@ -747,46 +747,88 @@ def rellenar_factura_guia_estatica(doc_path, factura):
     base_folio = str(factura_base.folio).strip() if factura_base and factura_base.folio else None
     base_serie = str(factura_base.serie).strip() if factura_base and factura_base.serie else None
 
-    # 1. Reemplazo de Codigo QR
+    # 1. Reemplazo de Codigo QR garantizado
     qr_stream = generar_qr_stream(f"{base_url}/factura/{cufe}/")
     qr_bytes = qr_stream.getvalue()
 
     qr_rid_identified = None
+    # A. Buscar alrededor de palabras clave (CUFE o QR) en un rango amplio (-3 a +7)
     for i, p in enumerate(doc.paragraphs):
-        if 'CUFE' in p.text.upper() or 'QR' in p.text.upper():
-            for cand_p in doc.paragraphs[i:min(i + 4, len(doc.paragraphs))]:
-                if 'drawing' in cand_p._p.xml or 'graphic' in cand_p._p.xml:
-                    eids = re.findall(r'embed=[\x22\x27]([^\x22\x27]+)', cand_p._p.xml)
-                    if eids:
-                        qr_rid_identified = eids[0]
+        p_txt_u = p.text.upper()
+        if 'CUFE' in p_txt_u or 'QR' in p_txt_u or 'FACTURADOR' in p_txt_u:
+            rango_cand = doc.paragraphs[max(0, i - 3):min(i + 8, len(doc.paragraphs))]
+            for cand_p in rango_cand:
+                if 'drawing' in cand_p._p.xml or 'blip' in cand_p._p.xml or 'imagedata' in cand_p._p.xml:
+                    eids = re.findall(r'(?:embed|id)=[\x22\x27](rId\d+)', cand_p._p.xml)
+                    for eid in eids:
+                        if eid in doc.part.rels:
+                            rel = doc.part.rels[eid]
+                            if 'image' in rel.target_ref or 'image' in getattr(rel.target_part, 'content_type', ''):
+                                try:
+                                    img = Image.open(io.BytesIO(rel.target_part._blob))
+                                    ratio = img.width / float(img.height or 1)
+                                    if 0.75 <= ratio <= 1.3:
+                                        qr_rid_identified = eid
+                                        break
+                                except Exception:
+                                    pass
+                    if qr_rid_identified:
                         break
-            if qr_rid_identified:
-                break
+        if qr_rid_identified:
+            break
 
-    if qr_rid_identified and qr_rid_identified in doc.part.rels:
-        doc.part.rels[qr_rid_identified].target_part._blob = qr_bytes
-    else:
+    # B. Si no se identifico cerca de CUFE, buscar cualquier imagen cuadrada en el documento
+    if not qr_rid_identified:
         for rId, rel in doc.part.rels.items():
             if 'image' in rel.target_ref or 'image' in getattr(rel.target_part, 'content_type', ''):
                 try:
                     img = Image.open(io.BytesIO(rel.target_part._blob))
                     ratio = img.width / float(img.height or 1)
-                    if 0.8 <= ratio <= 1.25 and img.width >= 100:
-                        rel.target_part._blob = qr_bytes
+                    if 0.75 <= ratio <= 1.3:
+                        qr_rid_identified = rId
+                        break
                 except Exception:
                     pass
 
-    # 2. Reemplazo de Barcode (si existe y tiene ratio >= 2.0 y la plantilla no es JUMBO)
+    # C. Inyectar bytes de QR en la relacion encontrada
+    if qr_rid_identified and qr_rid_identified in doc.part.rels:
+        doc.part.rels[qr_rid_identified].target_part._blob = qr_bytes
+    else:
+        # D. Si la plantilla no tiene imagen de QR, insertar imagen en placeholder o tras CUFE
+        qr_insertado = False
+        for p in doc.paragraphs:
+            if '{{ qr }}' in p.text.lower() or '[qr]' in p.text.lower() or '[[qr]]' in p.text.lower():
+                p.text = ""
+                run = p.add_run()
+                qr_stream.seek(0)
+                run.add_picture(qr_stream, width=Inches(1.5), height=Inches(1.5))
+                p.alignment = 1
+                qr_insertado = True
+                break
+        if not qr_insertado:
+            for i, p in enumerate(doc.paragraphs):
+                if 'CUFE' in p.text.upper():
+                    idx_ins = min(i + 2, len(doc.paragraphs) - 1)
+                    target_p = doc.paragraphs[idx_ins]
+                    new_p = target_p.insert_paragraph_before()
+                    new_p.alignment = 1
+                    qr_stream.seek(0)
+                    new_p.add_run().add_picture(qr_stream, width=Inches(1.5), height=Inches(1.5))
+                    break
+
+    # 2. Reemplazo de Barcode (preservando dimensiones exactas sin deformar)
     is_jumbo = 'jumbo' in os.path.basename(doc_path).lower() or getattr(factura, 'plantilla', '') == 'JUMBO'
     if not is_jumbo and numero_factura:
         for rId, rel in doc.part.rels.items():
+            if rId == qr_rid_identified:
+                continue
             if 'image' in rel.target_ref or 'image' in getattr(rel.target_part, 'content_type', ''):
                 try:
                     img = Image.open(io.BytesIO(rel.target_part._blob))
                     ratio = img.width / float(img.height or 1)
-                    if ratio >= 2.2:
-                        bc_stream = generar_barcode_stream(numero_factura)
-                        rel.target_part._blob = bc_stream.getvalue()
+                    if ratio >= 2.0:
+                        bc_bytes = generar_barcode_bytes_resized(numero_factura, target_width=img.width, target_height=img.height)
+                        rel.target_part._blob = bc_bytes
                         break
                 except Exception:
                     pass
@@ -806,27 +848,44 @@ def rellenar_factura_guia_estatica(doc_path, factura):
             return True
         return False
 
-    # 3. Reemplazo en parrafos
+    # 3. Reemplazo en parrafos (CUFE universal, Serie, Folio, Fechas y Horas)
     parrafos_a_remover = []
     total_paragraphs = len(doc.paragraphs)
     for idx, p in enumerate(doc.paragraphs):
         p_text = p.text
+        p_clean = p_text.strip()
+        p_upper = p_clean.upper()
 
-        # CUFE y FACTURADOR con eliminacion limpia sin espacios residuales
-        if p_text.strip() in ('CUFE :', 'CUFE : ', 'CUFE:'):
+        # Caso A: Estilo Éxito - "Cufe:..." o "CUFE:..." (con o sin hash pegado)
+        if re.match(r'^(?:Cufe|CUFE)\s*:', p_clean):
+            p.text = f"Cufe:{cufe[:34]}"
+            for r in p.runs:
+                _forzar_fuente_8pt(r)
+            if idx + 1 < total_paragraphs:
+                p_next = doc.paragraphs[idx + 1]
+                txt_next = p_next.text.strip()
+                if re.match(r'^[0-9a-zA-Z\s]{15,90}$', txt_next) and not any(k in txt_next for k in ('Toshiba', 'SuperMarket', 'Cadena', 'RESOL', 'NIT', 'DIAN', 'RANG', 'FACTURA')):
+                    p_next.text = cufe[34:]
+                    for r in p_next.runs:
+                        _forzar_fuente_8pt(r)
+            continue
+
+        # Caso B: Estilo Jumbo / Frisby - "CUFE :" o "CUFE:" en su propia linea
+        elif p_clean in ('CUFE :', 'CUFE : ', 'CUFE:', 'CUFE'):
             if idx + 1 < total_paragraphs:
                 p_next = doc.paragraphs[idx + 1]
                 p_next.text = cufe
                 for r in p_next.runs:
                     _forzar_fuente_8pt(r)
-            # Marcar lineas residuales del CUFE antes del QR del XML para remover
             for sub_i in range(idx + 2, min(idx + 6, total_paragraphs)):
                 p_sub = doc.paragraphs[sub_i]
                 if 'drawing' in p_sub._p.xml or 'graphic' in p_sub._p.xml or 'FACTURADOR' in p_sub.text:
                     break
                 parrafos_a_remover.append(p_sub)
             continue
-        elif 'FACTURADOR' in p_text and ('CUFE' in p_text or ':' in p_text):
+
+        # Caso C: Estilo FACTURADOR Jumbo - "FACTURADOR : ... - CUFE"
+        elif 'FACTURADOR' in p_upper and ('CUFE' in p_upper or ':' in p_text):
             p.text = f"  FACTURADOR  :  {serie}- {folio}   - CUFE "
             for r in p.runs:
                 _forzar_fuente_8pt(r)
@@ -844,7 +903,23 @@ def rellenar_factura_guia_estatica(doc_path, factura):
                 else:
                     parrafos_a_remover.append(p_next)
             continue
-        elif re.match(r'^[0-9a-zA-Z\s]{25,120}$', p_text.strip()) and any(k in doc.paragraphs[max(0, idx-2)].text for k in ('CUFE', 'FACTURADOR', 'Cufe')):
+
+        # Caso D: Parrafo que contiene "CUFE" y un hash largo (30+ caracteres hex)
+        elif 'CUFE' in p_upper and re.search(r'[0-9a-fA-F]{30,}', p_text):
+            p.text = re.sub(r'[0-9a-fA-F]{30,}', cufe, p_text)
+            for r in p.runs:
+                _forzar_fuente_8pt(r)
+            continue
+
+        # Caso E: Placeholder Jinja en plantilla
+        elif '{{' in p_text and ('cufe' in p_text.lower() or 'qr' in p_text.lower()):
+            reemplazar_en_parrafo(p, r'\{\{\s*cufe\s*\}\}', cufe)
+            reemplazar_en_parrafo(p, r'\{\{\s*cufe_linea_1\s*\}\}', cufe[:34])
+            reemplazar_en_parrafo(p, r'\{\{\s*cufe_linea_2\s*\}\}', cufe[34:])
+            continue
+
+        # Caso F: Residuo de hash solitario tras FACTURADOR o CUFE
+        elif re.match(r'^[0-9a-zA-Z\s]{25,120}$', p_clean) and any(k in doc.paragraphs[max(0, idx-2)].text for k in ('CUFE', 'FACTURADOR', 'Cufe')):
             parrafos_a_remover.append(p)
             continue
 
